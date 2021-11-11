@@ -1,0 +1,80 @@
+@startuml
+
+participant "Node" as Node order 5
+participant "EnactTrust\nFrontEnd" as FE order 10
+participant "EnactTrust\nBackEnd" as BE order 20
+database "EnactTrust\nBackend DB" as BE_DB order 30
+participant "Veraison\nEvidence\nVerification" as V_EviVfy order 35
+participant "Veraison\nEndorsements\nProvisioning" as V_EndProv order 40
+database "Veraison\nEndorsement Store" as V_EndStore order 50
+
+group Node ID assignment
+	FE -> BE: POST /node/new
+	BE -> BE: generate nodeID
+	BE -> BE_DB: store nodeID
+	BE -> FE: Status: 201, Body: {nodeID}
+end
+
+group keys provisioning
+	Node -> BE: POST /node/pem, Body: {nodeID, AK_pub, EK_pub}
+	BE -> BE: repackage {nodeID, AK_pub} as CoRIM
+	BE -> V_EndProv: POST /submit, Body: CoRIM{nodeID, AK_pub}
+	V_EndProv -> V_EndStore: nodeID=>{AK_pub}
+	V_EndProv -> BE: Status: 200
+	BE -> Node: Status: 200
+end
+
+group golden values provisioning
+	Node -> BE: POST /node/secret, Body: {nodeID}
+	BE -> V_EviVfy: POST /newSession
+	V_EviVfy -> V_EviVfy: /session/123=>{"nonce"="the-challenge", ...}
+	V_EviVfy -> BE: Status: 201, Location: /session/123, Body: {"nonce"="the-challenge", ...}
+	BE -> BE: Encrypt(EK_pub, "the-challenge") -> N
+	BE -> Node: Status: 200, Body: {N}
+
+	Node -> Node: Decrypt(EK_priv, N) -> "the-challenge"
+	Node -> BE: POST /node/golden, Body: {nodeID, TPMS_ATTEST("the-challenge", golden)}
+	BE -> V_EviVfy: POST /session/123, Body: TBD1_MimeType{nodeID, TPMS_ATTEST("the-challenge", golden)}
+	note right: we need to agree on the exact MIME type format
+	V_EviVfy -> V_EndStore: lookupKeys(nodeID)
+	V_EndStore -> V_EviVfy: AK_pub
+	V_EviVfy -> V_EviVfy: Verify(AK_pub, TPMS_ATTEST("the-challenge", golden))
+	alt verification successful
+		V_EviVfy -> BE: Status: 200, Body: {"state": "complete", "results": "success"}
+		BE -> BE: repackage {nodeID, TPMS_ATTEST("the-challenge", golden)} as CoRIM
+		BE -> V_EndProv: POST /submit, Body: CoRIM{nodeID, golden}
+		V_EndProv -> V_EndStore: nodeID=>{golden}
+		V_EndProv -> BE: Status: 200
+		BE -> FE: Status: 200
+	else verification failed
+		V_EviVfy -> BE: Status: 200, Body: {"state": "complete", "results": "failure"}
+		BE -> FE: Status: 500
+	end
+	BE -> BE_DB: update node state
+end
+
+group periodic evidence submission
+	Node -> BE: POST /node/secret, Body: {nodeID}
+	BE -> V_EviVfy: POST /newSession
+	V_EviVfy -> V_EviVfy: /session/456=>{"nonce"="another-challenge", ...}
+	V_EviVfy -> BE: Status: 201, Location: /session/456, Body: {"nonce"="another-challenge", ...}
+	BE -> BE: Encrypt(EK_pub, "another-challenge") -> N
+	BE -> Node: Status: 200, Body: {N}
+
+	Node -> Node: Decrypt(EK_priv, N) -> "another-challenge"
+	Node -> BE: POST /node/evidence, Body: {nodeID, TPMS_ATTEST("another-challenge", evidence)}
+	BE -> V_EviVfy: POST /session/456, Body: TBD1_MimeType{nodeID, TPMS_ATTEST("another-challenge", evidence)}
+	V_EviVfy -> V_EndStore: lookupKeys(nodeID)
+	V_EndStore -> V_EviVfy: AK_pub
+	V_EviVfy -> V_EviVfy: Verify(AK_pub, TPMS_ATTEST("another-challenge", evidence))
+	alt verification successful
+		V_EviVfy -> BE: Status: 200, Body: {"state": "complete", "results": "success"}
+		BE -> Node: Status: 200
+	else verification failed
+		V_EviVfy -> BE: Status: 200, Body: {"state": "complete", "results": "failure"}
+		BE -> Node: Status: 500
+	end
+	BE -> BE_DB: update node state
+end
+
+@enduml
