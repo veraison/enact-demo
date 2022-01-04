@@ -9,9 +9,10 @@ participant "Veraison\nEndorsements\nProvisioning" as V_EndProv order 40
 database "Veraison\nEndorsement Store" as V_EndStore order 50
 
 group keys provisioning and Node ID assignment
+
 	Node -> BE: POST /node/pem, Body: {nodeID, AK_pub, EK_pub}
 	BE -> BE: generate nodeID
-	BE -> BE_DB: store nodeID
+	BE -> BE_DB: store nodeID AK_pub and EK_pub
 	BE -> BE: repackage {nodeID, AK_pub} as CoRIM
 	BE -> V_EndProv: POST /submit, Body: CoRIM{nodeID, AK_pub}
 	V_EndProv -> V_EndStore: nodeID=>{AK_pub}
@@ -28,17 +29,19 @@ group golden values provisioning
 	BE -> Node: Status: 200, Body: {N}
 
 	Node -> Node: Decrypt(EK_priv, N) -> "the-challenge"
-	Node -> BE: POST /node/golden, Body: {TPMS_ATTEST(nodeID, "the-challenge", golden)}
-	BE -> V_EviVfy: POST /session/123, Body: TBD1_MimeType{TPMS_ATTEST(nodeID, "the-challenge", golden)}
-	note right: we need to agree on the exact MIME type format
-	V_EviVfy -> V_EviVfy: extract nodeID from TPMS_ATTEST.extraData
+	Node -> Node: TPM2_Quote("the-challenge", PCR23) -> golden
+	Node -> BE: POST /node/golden, Body: {nodeID, golden}
+	BE -> BE: repackage {nodeID, golden} as CoRIM with vnd.enacttrust.tpm-evidence payload
+	BE -> V_EviVfy: POST /session/123, Body: CoRIM{vnd.enacttrust.tpm-evidence}
+	V_EviVfy -> V_EviVfy: CoRIM{TPMS_ATTEST.extraData} -> nodeID
 	V_EviVfy -> V_EndStore: lookupKeys(nodeID)
 	V_EndStore -> V_EviVfy: AK_pub
-	V_EviVfy -> V_EviVfy: Verify(AK_pub, TPMS_ATTEST("the-challenge", golden))
+	V_EviVfy -> V_EviVfy: CoRIM{TPMS_ATTEST, TPMT_SIGNATURE} -> TPM_evidence
+	V_EviVfy -> V_EviVfy: Verify(AK_pub, TPM_evidence) for identity and data integrity
+	V_EviVfy -> V_EviVfy: Verify("the-challenge")) to confirm a geniune golden value
 	alt verification successful
 		V_EviVfy -> BE: Status: 200, Body: {"state": "complete", "results": "success"}
-		BE -> BE: repackage {TPMS_ATTEST(nodeID, "the-challenge", golden)} as CoRIM
-		BE -> V_EndProv: POST /submit, Body: CoRIM{nodeID, golden}
+		BE -> V_EndProv: POST /submit, Body: CoRIM{vnd.enacttrust.tpm-evidence}
 		V_EndProv -> V_EndStore: nodeID=>{golden}
 		V_EndProv -> BE: Status: 200
 		BE -> FE: Status: 200
@@ -58,12 +61,16 @@ group periodic evidence submission
 	BE -> Node: Status: 200, Body: {N}
 
 	Node -> Node: Decrypt(EK_priv, N) -> "another-challenge"
-	Node -> BE: POST /node/evidence, Body: {TPMS_ATTEST(nodeID, "another-challenge", evidence)}
-	BE -> V_EviVfy: POST /session/456, Body: TBD1_MimeType{TPMS_ATTEST(nodeID, "another-challenge", evidence)}
-	V_EviVfy -> V_EviVfy: extract nodeID from TPMS_ATTEST.extraData
+	Node -> Node: TPM2_Quote("another-challenge", PCR23) -> evidence
+	Node -> BE: POST /node/evidence, Body: {nodeID, TPMS_ATTEST("another-challenge", evidence)}
+	BE -> BE: repackage {nodeID, golden} as CoRIM with vnd.enacttrust.tpm-evidence payload
+	BE -> V_EviVfy: POST /session/456, Body: CoRIM{vnd.enacttrust.tpm-evidence}
+	V_EviVfy -> V_EviVfy: CoRIM{TPMS_ATTEST.extraData} -> nodeID
 	V_EviVfy -> V_EndStore: lookupKeys(nodeID)
 	V_EndStore -> V_EviVfy: AK_pub
-	V_EviVfy -> V_EviVfy: Verify(AK_pub, TPMS_ATTEST(nodeID, "another-challenge", evidence))
+	V_EviVfy -> V_EviVfy: CoRIM{TPMS_ATTEST, TPMT_SIGNATURE} -> TPM_evidence
+	V_EviVfy -> V_EviVfy: Verify(AK_pub, TPM_evidence)) for identity and data integrity
+	V_EviVfy -> V_EviVfy: Verify("the-challenge")) to mitigate MITM attacks
 	alt verification successful
 		V_EviVfy -> BE: Status: 200, Body: {"state": "complete", "results": "success"}
 		BE -> Node: Status: 200
