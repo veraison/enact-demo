@@ -61,15 +61,13 @@ group periodic evidence submission
 
 	Node -> Node: Decrypt(EK_priv, N) -> "another-challenge"
 	Node -> Node: TPM2_Quote("another-challenge", PCR23) -> evidence
-	Node -> BE: POST /node/evidence, Body: {nodeID, TPMS_ATTEST("another-challenge", evidence)}
-	BE -> BE: repackage {nodeID, golden} as CoRIM with vnd.enacttrust.tpm-evidence payload
-	BE -> V_EviVfy: POST /session/456, Body: CoRIM{vnd.enacttrust.tpm-evidence}
-	V_EviVfy -> V_EviVfy: CoRIM{TPMS_ATTEST.extraData} -> nodeID
+	Node -> BE: POST /node/evidence, Body: {nodeID, evidence)}
+	BE -> V_EviVfy: POST /session/456, C-T: application/vnd.enacttrust.tpm-evidence; \n Body: {TPMS_ATTEST_LENGTH || TPMS_ATTEST || TPMT_SIGNATURE }
+	V_EviVfy -> V_EviVfy: Extract nodeID from TPMS_ATTEST.extraData
 	V_EviVfy -> V_EndStore: lookupKeys(nodeID)
 	V_EndStore -> V_EviVfy: AK_pub
-	V_EviVfy -> V_EviVfy: CoRIM{TPMS_ATTEST, TPMT_SIGNATURE} -> TPM_evidence
-	V_EviVfy -> V_EviVfy: Verify(AK_pub, TPM_evidence)) for identity and data integrity
-	V_EviVfy -> V_EviVfy: Verify("the-challenge")) to mitigate MITM attacks
+	V_EviVfy -> V_EviVfy: Verify(AK_pub, TPMS_ATTEST, TPMT_SIGNATURE)
+	V_EviVfy -> V_EviVfy: Verify("the-challenge"))
 	alt verification successful
 		V_EviVfy -> BE: Status: 200, Body: {"state": "complete", "results": "success"}
 		BE -> Node: Status: 200
