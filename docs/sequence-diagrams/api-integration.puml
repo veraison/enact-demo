@@ -14,7 +14,7 @@ group keys provisioning and Node ID assignment
 	BE -> BE: generate nodeID
 	BE -> BE_DB: store nodeID AK_pub and EK_pub
 	BE -> BE: repackage {nodeID, AK_pub} as CoRIM
-	BE -> V_EndProv: POST /submit, Body: CoRIM{nodeID, AK_pub}
+	BE -> V_EndProv: POST /submit, C-T: application/corim+cbor; \n profile=enacttrust-tpm Body: CoRIM{AVK(nodeID, AK_pub)}
 	V_EndProv -> V_EndStore: nodeID=>{AK_pub}
 	V_EndProv -> BE: Status: 200
 	BE -> Node: Status: 201, Body: {nodeID}
@@ -31,18 +31,17 @@ group golden values provisioning
 	Node -> Node: Decrypt(EK_priv, N) -> "the-challenge"
 	Node -> Node: TPM2_Quote("the-challenge", PCR23) -> golden
 	Node -> BE: POST /node/golden, Body: {nodeID, golden}
-	BE -> BE: repackage {nodeID, golden} as CoRIM with vnd.enacttrust.tpm-evidence payload
-	BE -> V_EviVfy: POST /session/123, Body: CoRIM{vnd.enacttrust.tpm-evidence}
-	V_EviVfy -> V_EviVfy: CoRIM{TPMS_ATTEST.extraData} -> nodeID
+	BE -> V_EviVfy: POST /session/123, C-T: application/vnd.enacttrust.tpm-evidence; \n Body: {TPMS_ATTEST_LENGTH || TPMS_ATTEST || TPMT_SIGNATURE }
+	V_EviVfy -> V_EviVfy: Extract nodeID from TPMS_ATTEST.extraData
 	V_EviVfy -> V_EndStore: lookupKeys(nodeID)
 	V_EndStore -> V_EviVfy: AK_pub
-	V_EviVfy -> V_EviVfy: CoRIM{TPMS_ATTEST, TPMT_SIGNATURE} -> TPM_evidence
-	V_EviVfy -> V_EviVfy: Verify(AK_pub, TPM_evidence) for identity and data integrity
-	V_EviVfy -> V_EviVfy: Verify("the-challenge")) to confirm a geniune golden value
+	V_EviVfy -> V_EviVfy: Verify(AK_pub, TPMS_ATTEST, TPMT_SIGNATURE)
+	V_EviVfy -> V_EviVfy: Verify("the-challenge"))
 	alt verification successful
 		V_EviVfy -> BE: Status: 200, Body: {"state": "complete", "results": "success"}
-		BE -> V_EndProv: POST /submit, Body: CoRIM{vnd.enacttrust.tpm-evidence}
-		V_EndProv -> V_EndStore: nodeID=>{golden}
+		BE -> BE: repackage {nodeID, golden-value from TPMS_ATTEST} as CoRIM
+		BE -> V_EndProv: POST /submit, C-T: application/corim+cbor; Body: CoRIM{nodeID, golden-value}
+		V_EndProv -> V_EndStore: nodeID=>{golden-value}
 		V_EndProv -> BE: Status: 200
 		BE -> FE: Status: 200
 	else verification failed
