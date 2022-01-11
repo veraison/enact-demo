@@ -10,7 +10,7 @@ database "Veraison\nEndorsement Store" as V_EndStore order 50
 
 group keys provisioning and Node ID assignment
 
-	Node -> BE: POST /node/pem, Body: {nodeID, AK_pub, EK_pub}
+	Node -> BE: POST /node/pem, Body: {AK_pub, EK_pub}
 	BE -> BE: generate nodeID
 	BE -> BE_DB: store nodeID AK_pub and EK_pub
 	BE -> BE: repackage {nodeID, AK_pub} as CoRIM
