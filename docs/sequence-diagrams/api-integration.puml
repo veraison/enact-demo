@@ -14,7 +14,7 @@ group keys provisioning and Node ID assignment
 	BE -> BE: generate nodeID
 	BE -> BE_DB: store nodeID AK_pub and EK_pub
 	BE -> BE: repackage {nodeID, AK_pub} as CoRIM
-	BE -> V_EndProv: POST /submit, C-T: application/corim+cbor; \n profile=enacttrust-tpm Body: CoRIM{AVK(nodeID, AK_pub)}
+	BE -> V_EndProv: POST /submit, C-T: "application/corim-unsigned+cbor; profile=http://enacttrust.com/veraison/1.0.0" Body: CoRIM{AVK(nodeID, AK_pub)}
 	V_EndProv -> V_EndStore: nodeID=>{AK_pub}
 	V_EndProv -> BE: Status: 200
 	BE -> Node: Status: 201, Body: {nodeID}
