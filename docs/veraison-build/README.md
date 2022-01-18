@@ -43,7 +43,7 @@ go install github.com/mitchellh/protoc-gen-go-json@latest
 * checkout code 
 
 ```sh
-git clone -b provisioning-part1 https://github.com/veraison/veraison
+git clone https://github.com/veraison/veraison
 ```
 
 * build the provisioning frontend
