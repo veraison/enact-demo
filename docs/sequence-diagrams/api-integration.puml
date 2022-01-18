@@ -40,7 +40,7 @@ group golden values provisioning
 	alt verification successful
 		V_EviVfy -> BE: Status: 200, Body: {"state": "complete", "results": "success"}
 		BE -> BE: repackage {nodeID, golden-value from TPMS_ATTEST} as CoRIM
-		BE -> V_EndProv: POST /submit, C-T: application/corim+cbor; Body: CoRIM{nodeID, golden-value}
+		BE -> V_EndProv: POST /submit, C-T: "application/corim-unsigned+cbor; profile=http://enacttrust.com/veraison/1.0.0" Body: CoRIM{nodeID, golden-value}
 		V_EndProv -> V_EndStore: nodeID=>{golden-value}
 		V_EndProv -> BE: Status: 200
 		BE -> FE: Status: 200
