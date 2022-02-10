@@ -85,5 +85,5 @@ func main() {
 
 	gin := setupRoutes(nodeService)
 
-	gin.Run(":8080")
+	gin.Run(":8000")
 }

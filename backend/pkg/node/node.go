@@ -3,10 +3,11 @@ package node
 import (
 	// "backend/pkg/enactcorim"
 	"log"
-
-	"enactcorim"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/veraison/enact-demo/pkg/enactcorim"
+	"github.com/veraison/enact-demo/pkg/veraison"
 )
 
 type NodeService struct {
@@ -32,27 +33,49 @@ func (n *NodeService) HandleReceivePEM(akPub string, ekPub string) error {
 	nodeID, err := uuid.NewUUID()
 	if err != nil {
 		log.Println("Error generating node UUID")
+		return err
 	}
 
-	_ = nodeID
+	log.Println(nodeID)
 
-	// 3. Store node_id, AK_pub, EK_pub in the DB
+	// 3. Init node entity and store it in the db
+	node := Node{
+		ID:         nodeID,
+		AK_Pub:     akPub,
+		EK_Pub:     ekPub,
+		Created_At: time.Now().UTC().String(),
+	}
+
+	log.Println(nodeID)
+
+	err = n.repo.CreateNewNode(&node)
+	if err != nil {
+		log.Println(err.Error())
+		return err
+	}
 
 	// 4. Repackage node_id and AK pub as CoRIM
-	c, err := enactcorim.RepackageNodePEM(akPub, nodeID)
+	corim, err := enactcorim.RepackageNodePEM(akPub, nodeID)
 	if err != nil {
 		log.Fatal(err)
 		return err
 	}
 
-	out, err := c.ToCBOR()
-	_ = out
-	if err != nil {
-		log.Fatal(err)
-		return err
-	}
+	log.Println(corim)
+
+	// out, err := c.ToCBOR()
+	// _ = out
+	// if err != nil {
+	// 	log.Fatal(err)
+	// 	return err
+	// }
 
 	// 5. `POST /submit, Body: { CoRIM }` to veraison backend and forward response to agent
+	err = veraison.SendPEMToVeraison(corim)
+	if err != nil {
+		log.Fatal(err)
+		return err
+	}
 
 	return nil
 }
