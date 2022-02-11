@@ -94,11 +94,13 @@ There is a `curl(1)`-based test script in the `provisioning/test` folder which c
 cd provisioning/test
 ```
 
-* Provision an EnactTrust AK and check the store is populated accordingly (you need to install `jq(1)`):
+* Provision an EnactTrust AK and check the store is populated accordingly (you need to install `jq(1)` and `sqlite3(1)`):
 
 ```sh
 B=trustanchor T=tpm-enacttrust ./req.sh
+```
 
+```sh
 sqlite3 ../../vts-temp/cmd/veraison-trustanchor.sql 'SELECT DISTINCT val FROM trustanchor'  | jq .
 ```
 
@@ -106,6 +108,8 @@ sqlite3 ../../vts-temp/cmd/veraison-trustanchor.sql 'SELECT DISTINCT val FROM tr
 
 ```sh
 B=refvalue T=tpm-enacttrust ./req.sh
+```
 
+```sh
 sqlite3 ../../vts-temp/cmd/veraison-endorsement.sql 'SELECT DISTINCT val FROM endorsement'  | jq .
 ```
