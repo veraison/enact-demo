@@ -7,7 +7,7 @@ const create_schema string = `
 		id STRING NOT NULL PRIMARY KEY,
 		ak_pub STRING,
 		ek_pub STRING,
-		created_at STRING;
+		created_at STRING
 	);`
 
 func InitDatabaseConnection() (*sqlx.DB, error) {

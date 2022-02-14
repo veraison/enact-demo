@@ -36,8 +36,6 @@ func (n *NodeService) HandleReceivePEM(akPub string, ekPub string) error {
 		return err
 	}
 
-	log.Println(nodeID)
-
 	// 3. Init node entity and store it in the db
 	node := Node{
 		ID:         nodeID,
@@ -46,9 +44,7 @@ func (n *NodeService) HandleReceivePEM(akPub string, ekPub string) error {
 		Created_At: time.Now().UTC().String(),
 	}
 
-	log.Println(nodeID)
-
-	err = n.repo.CreateNewNode(&node)
+	err = n.repo.InsertNode(node)
 	if err != nil {
 		log.Println(err.Error())
 		return err
@@ -57,23 +53,24 @@ func (n *NodeService) HandleReceivePEM(akPub string, ekPub string) error {
 	// 4. Repackage node_id and AK pub as CoRIM
 	corim, err := enactcorim.RepackageNodePEM(akPub, nodeID)
 	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	log.Println(`successfully repacked node PEM as corim`)
+
+	cbor, err := corim.ToCBOR()
+	if err != nil {
 		log.Fatal(err)
 		return err
 	}
 
-	log.Println(corim)
-
-	// out, err := c.ToCBOR()
-	// _ = out
-	// if err != nil {
-	// 	log.Fatal(err)
-	// 	return err
-	// }
+	log.Println(`successfully converted corim to cbor`)
 
 	// 5. `POST /submit, Body: { CoRIM }` to veraison backend and forward response to agent
-	err = veraison.SendPEMToVeraison(corim)
+	err = veraison.SendPEMToVeraison(cbor)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 		return err
 	}
 

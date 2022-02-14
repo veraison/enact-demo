@@ -10,7 +10,7 @@ import (
 )
 
 type NodeRepository interface {
-	CreateNewNode(node *Node) error
+	InsertNode(node Node) error
 	ListNodes() ([]Node, error)
 	GetNodeById(node_id string) (*Node, error)
 }
@@ -20,7 +20,7 @@ type SQLiteNodeRepo struct {
 }
 
 var (
-	ErrNotFound = errors.New("Not Found")
+	ErrNotFound = errors.New("not found")
 )
 
 func NewNodeRepo(db *sqlx.DB) NodeRepository {
@@ -29,7 +29,7 @@ func NewNodeRepo(db *sqlx.DB) NodeRepository {
 	}
 }
 
-func (repo *SQLiteNodeRepo) CreateNewNode(node *Node) error {
+func (repo SQLiteNodeRepo) InsertNode(node Node) error {
 	const query = `
 		INSERT INTO nodes (
 			id,
@@ -44,13 +44,17 @@ func (repo *SQLiteNodeRepo) CreateNewNode(node *Node) error {
 			:created_at
 		);`
 
+	log.Println(`db`, repo.db)
+
 	statement, err := repo.db.PrepareNamed(query)
 	if err != nil {
+		log.Println(err.Error())
 		return err
 	}
 
 	response, err := statement.Exec(&node)
 	if err != nil {
+		log.Println(err.Error())
 		return err
 	}
 
@@ -65,13 +69,13 @@ func (repo *SQLiteNodeRepo) CreateNewNode(node *Node) error {
 	return nil
 }
 
-func (repo *SQLiteNodeRepo) ListNodes() ([]Node, error) {
+func (repo SQLiteNodeRepo) ListNodes() ([]Node, error) {
 	var nodes_list []Node = []Node{}
 
 	return nodes_list, nil
 }
 
-func (repo *SQLiteNodeRepo) GetNodeById(node_id string) (*Node, error) {
+func (repo SQLiteNodeRepo) GetNodeById(node_id string) (*Node, error) {
 	node := Node{}
 
 	const query = `

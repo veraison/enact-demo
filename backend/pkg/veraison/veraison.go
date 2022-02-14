@@ -3,25 +3,31 @@ package veraison
 import (
 	"log"
 
-	"github.com/veraison/corim/corim"
+	"github.com/veraison/apiclient/provisioning"
 )
 
-func SendPEMToVeraison(corimData *corim.UnsignedCorim) error {
-	// TODO: place corim into a byte array, because that's what the http package wants to have for the POST body
-	// var buf []byte
-	// postBody := bytes.NewBuffer(buf)
-	// resp, err := http.Post("", "application/json", postBody)
-	// _ = resp
-	// defer resp.Body.Close()
+func SendPEMToVeraison(cbor []byte) error {
+	// This uses the Veraison api-client
+	cfg := provisioning.SubmitConfig{
+		// TODO: replace this with an env var URL
+		SubmitURI: "http://localhost:8888/endorsement-provisioning/v1/submit",
+	}
+	// The Run method is invoked on the instantiated SubmitConfig object to
+	// trigger the protocol FSM, hiding any details about the synchronus / async nature
+	// of the underlying exchange.  The user must supply the byte buffer containing the
+	// serialized endorsement, and the associated media type:
+	err := cfg.Run(cbor, "application/corim-unsigned+cbor; profile=http://enacttrust.com/veraison/1.0.0")
+	if err != nil {
+		log.Println(err.Error())
+		return err
+	}
 
-	// if err != nil {
-	// 	log.Println(err.Error())
-	// }
+	if err != nil {
+		log.Println(err.Error())
+		return err
+	}
 
-	// veraisonResponse, err := ioutil.ReadAll(resp.Body)
-	// _ = veraisonResponse
-
-	log.Println("Sending CORIM to Veraison")
+	log.Println("CORIM successfully sent to Veraison")
 
 	return nil
 }
