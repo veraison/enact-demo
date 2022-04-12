@@ -7,6 +7,10 @@ import (
 )
 
 func SendPEMToVeraison(cbor []byte) error {
+	// writeErr := os.WriteFile("pem-to-veraison", cbor, 0666)
+	// if writeErr != nil {
+	// 	log.Println("pem")
+	// }
 	// This uses the Veraison api-client
 	cfg := provisioning.SubmitConfig{
 		// TODO: replace this with an env var URL
