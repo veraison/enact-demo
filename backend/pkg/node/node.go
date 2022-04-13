@@ -26,7 +26,6 @@ import (
 type NodeService struct {
 	repo NodeRepository
 }
-
 type Node struct {
 	ID         uuid.UUID `db:"id"`
 	AK_Pub     string    `db:"ak_pub"`
@@ -94,7 +93,6 @@ func (n *NodeService) HandleReceivePEM(akPub string, ekPub string) (uuid.UUID, e
 func concatBuffers(firstBlob *bytes.Buffer, secondBlob *bytes.Buffer) *bytes.Buffer {
 	buf := &bytes.Buffer{}
 
-	// binary.Write(buf, binary.BigEndian, output.Bytes())
 	// read into a buffer as little endian ->
 	binary.Write(buf, binary.BigEndian, firstBlob.Bytes())
 	binary.Write(buf, binary.BigEndian, secondBlob.Bytes())
@@ -168,67 +166,61 @@ func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer,
 
 	// 0. TPMS_ATTEST Size
 	val := goldenBlob.Next(2)
-	// log.Printf("%b", val)
-	// log.Println("")
 
 	tpmsAttestSize := binary.LittleEndian.Uint16(val)
 
 	// Convert little endian to big endian
-	sizeBuf := make([]byte, 8)
+	sizeBuf := make([]byte, 2)
 	binary.BigEndian.PutUint16(sizeBuf, tpmsAttestSize)
 
 	// Write the big endian num to the buffer
 	binary.Write(bigEndianBuf, binary.BigEndian, sizeBuf)
+
+	log.Println(len(sizeBuf))
+
 	binary.Write(bigEndianBuf, binary.BigEndian, goldenBlob.Bytes())
 	binary.Write(bigEndianBuf, binary.BigEndian, signatureBlob.Bytes())
 
-	writeErr1 := os.WriteFile("big_1", bigEndianBuf.Bytes(), 0666)
+	writeErr1 := os.WriteFile("enact.blob", bigEndianBuf.Bytes(), 0666)
 	if writeErr1 != nil {
 		log.Println("error outputting blob")
 	}
 	log.Println("wrote blob to file")
+
 	// log.Println("tpmsAttestSize ENCODED")
 	// fmt.Printf("% 08b", bigEndianBuf)
 	// log.Println("")
-
-	// log.Println(binary.BigEndian.Uint16(bigEndianBuf.Bytes()))
-	// log.Println(binary.LittleEndian.Uint16(bigEndianBuf.Bytes()))
 
 	// 1. TPM_Magic
 	val = goldenBlob.Next(4)
 	tpmMagic := binary.BigEndian.Uint32(val)
 
-	binary.Write(bigEndianBuf, binary.BigEndian, tpmMagic)
+	sizeBuf = make([]byte, 4)
+	binary.BigEndian.PutUint32(sizeBuf, tpmMagic)
 
-	log.Println("after TPMmagic", goldenBlob.Len())
+	binary.Write(bigEndianBuf, binary.BigEndian, tpmMagic)
 
 	// 2. attest type
 	val = goldenBlob.Next(2)
 	attestType := binary.BigEndian.Uint16(val)
 
 	binary.Write(bigEndianBuf, binary.BigEndian, attestType)
-	log.Println("after attesttype", goldenBlob.Len())
 
 	// 3. qualifiedData
 	val = goldenBlob.Next(2)
 	nestedBufferSize := binary.BigEndian.Uint16(val)
 	qualifiedData := goldenBlob.Next(int(nestedBufferSize))
-	log.Println("nestedBufferSize", binary.BigEndian.Uint16(val), binary.LittleEndian.Uint16(val))
 
 	binary.Write(bigEndianBuf, binary.BigEndian, nestedBufferSize)
 	binary.Write(bigEndianBuf, binary.BigEndian, qualifiedData)
-	log.Println("after qualified", goldenBlob.Len())
 
 	// 4. extra data
 	val = goldenBlob.Next(2)
 	nestedBufferSize = binary.BigEndian.Uint16(val)
-	log.Println("nestedBufferSize", nestedBufferSize)
 	extraData := goldenBlob.Next(int(nestedBufferSize))
 
 	binary.Write(bigEndianBuf, binary.BigEndian, nestedBufferSize)
 	binary.Write(bigEndianBuf, binary.BigEndian, extraData)
-
-	log.Println("after extradata", goldenBlob.Len())
 
 	val = goldenBlob.Next(2)
 	// TODO: check digestSize, should usually be 24 bytes for SHA-256
@@ -240,7 +232,7 @@ func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer,
 
 	binary.Write(bigEndianBuf, binary.BigEndian, signatureBlob.Bytes())
 
-	// Write to a file for Sergei
+	// Write to a file
 	writeErr := os.WriteFile("big", bigEndianBuf.Bytes(), 0666)
 	if writeErr != nil {
 		log.Println("error outputting blob")
@@ -249,34 +241,6 @@ func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer,
 
 	return nil
 }
-
-func Printf(s string, n *NodeService) {
-	panic("unimplemented")
-}
-
-// We need to pass concat TPMS_LENGTH + TPMS_ATTEST + TPMS_SIGNATURE to Veraison
-// OR
-// pass tpm2.AttestationData struct
-// tpm2AttestationData := tpm2.AttestationData{
-// 	Magic: tpmMagic,
-// 	Type:  tpm2.TagAttestQuote,
-// 	AttestedQuoteInfo: &tpm2.QuoteInfo{
-// 		PCRSelection: tpm2.PCRSelection{Hash: tpm2.AlgSHA256, PCRs: ???????},
-// 		PCRDigest:    evidenceDigest,
-// 	},
-// }
-// {
-// 	~Magic: 0xff544347, ?????????
-// 	QualifiedSigner: tpm2.Name{
-// 		Digest: &tpm2.HashValue{Alg: tpm2.AlgSHA256, Value: desc.QualifiedSigner},
-// 	}, ????
-// 	FirmwareVersion: desc.FirmwareVersion,
-// 	~Type:            tpm2.TagAttestQuote,
-// 	AttestedQuoteInfo: &tpm2.QuoteInfo{
-// 		PCRSelection: tpm2.PCRSelection{Hash: tpm2.AlgSHA256, PCRs: desc.PCRs},
-// 		~PCRDigest:    desc.Digest,
-// 	},
-// }
 
 func (n *NodeService) HandleEvidence(nodeID string, evidenceBlob *bytes.Buffer, signatureBlob *bytes.Buffer) error {
 	node, err := n.repo.GetNodeById(nodeID)

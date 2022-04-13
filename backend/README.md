@@ -44,3 +44,8 @@ https://github.com/EnactTrust/enact/blob/8f4d4f741238e015d51aaa9d97ab0a7b94b635a
 
 little: 1110001
 big: 01001101
+
+### Print formatted bytes
+fmt.Printf("% 08b", bigEndianBuf)
+
+log.Printf("%b", val)
