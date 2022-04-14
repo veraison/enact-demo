@@ -181,7 +181,7 @@ func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer,
 	binary.Write(bigEndianBuf, binary.BigEndian, goldenBlob.Bytes())
 	binary.Write(bigEndianBuf, binary.BigEndian, signatureBlob.Bytes())
 
-	writeErr1 := os.WriteFile("enact.blob", bigEndianBuf.Bytes(), 0666)
+	writeErr1 := os.WriteFile("reference.blob", bigEndianBuf.Bytes(), 0666)
 	if writeErr1 != nil {
 		log.Println("error outputting blob")
 	}
@@ -230,10 +230,58 @@ func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer,
 	binary.Write(bigEndianBuf, binary.BigEndian, digestSize)
 	binary.Write(bigEndianBuf, binary.BigEndian, evidenceDigest)
 
-	binary.Write(bigEndianBuf, binary.BigEndian, signatureBlob.Bytes())
+	/* Parse signature struct */
+	// https://dox.ipxe.org/structTPMT__SIGNATURE.html
+
+	// 0. TPMI_ALG_SIG_SCHEME
+	val = signatureBlob.Next(2)
+	sigAlgId := binary.LittleEndian.Uint16(val)
+
+	tempBuf := make([]byte, 2)
+	binary.BigEndian.PutUint16(tempBuf, sigAlgId)
+
+	binary.Write(bigEndianBuf, binary.BigEndian, tempBuf)
+
+	// 1. TPMU_SIGNATURE
+	// 		struct TPMS_SIGNATURE_ECC {
+	// 			TPMI_ALG_HASH hash; - UINT16
+	// 			TPM2B_ECC_PARAMETER signatureR; - UINT16 size + BYTE buffer[MAX_ECC_KEY_BYTES];
+	// 			TPM2B_ECC_PARAMETER signatureS; - UINT16 size + BYTE buffer[MAX_ECC_KEY_BYTES];
+	// 		}
+
+	val = signatureBlob.Next(2)
+	tpmiAlgHash := binary.LittleEndian.Uint16(val)
+	// Swap endiannnes of tpmiAlgHash
+	tempBuf = make([]byte, 2)
+	binary.BigEndian.PutUint16(tempBuf, tpmiAlgHash)
+	binary.Write(bigEndianBuf, binary.BigEndian, tempBuf)
+
+	// Parsing signature R
+	val = signatureBlob.Next(2)
+	sizeR := binary.LittleEndian.Uint16(val)
+	sigR := signatureBlob.Next(int(sizeR))
+
+	// Swap endiannnes of sizeR
+	tempBuf = make([]byte, 2)
+	binary.BigEndian.PutUint16(tempBuf, sizeR)
+	binary.Write(bigEndianBuf, binary.BigEndian, tempBuf)
+
+	binary.Write(bigEndianBuf, binary.BigEndian, sigR)
+
+	// Parsing signature S
+	val = signatureBlob.Next(2)
+	sizeS := binary.LittleEndian.Uint16(val)
+	sigS := signatureBlob.Next(int(sizeS))
+
+	// Swap endiannnes of sizeS
+	tempBuf = make([]byte, 2)
+	binary.BigEndian.PutUint16(tempBuf, sizeS)
+	binary.Write(bigEndianBuf, binary.BigEndian, tempBuf)
+
+	binary.Write(bigEndianBuf, binary.BigEndian, sigS)
 
 	// Write to a file
-	writeErr := os.WriteFile("big", bigEndianBuf.Bytes(), 0666)
+	writeErr := os.WriteFile("big.blob", bigEndianBuf.Bytes(), 0666)
 	if writeErr != nil {
 		log.Println("error outputting blob")
 	}
@@ -327,3 +375,6 @@ func verifySignature(pemStr string, evidenceBlob *bytes.Buffer) (bool, error) {
 
 	return isValid, nil
 }
+
+
+

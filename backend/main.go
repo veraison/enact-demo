@@ -90,7 +90,7 @@ func setupRoutes(nodeService *node.NodeService) *gin.Engine {
 			})
 		} else {
 			c.JSON(201, gin.H{
-				"node_id": nodeID,
+				"node_id": nodeID.String(),
 			})
 		}
 	})
