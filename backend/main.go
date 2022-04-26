@@ -89,9 +89,7 @@ func setupRoutes(nodeService *node.NodeService) *gin.Engine {
 				"error": err.Error(),
 			})
 		} else {
-			c.JSON(201, gin.H{
-				"node_id": nodeID.String(),
-			})
+			c.String(201, nodeID.String())
 		}
 	})
 
@@ -156,9 +154,7 @@ func setupRoutes(nodeService *node.NodeService) *gin.Engine {
 				"error": err.Error(),
 			})
 		} else {
-			c.JSON(201, gin.H{
-				"node_id": nodeID,
-			})
+			c.Status(201)
 		}
 	})
 
@@ -219,9 +215,7 @@ func setupRoutes(nodeService *node.NodeService) *gin.Engine {
 				"error": err.Error(),
 			})
 		} else {
-			c.JSON(201, gin.H{
-				"node_id": nodeID,
-			})
+			c.Status(201)
 		}
 	})
 

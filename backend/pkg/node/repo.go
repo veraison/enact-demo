@@ -88,7 +88,7 @@ func (repo SQLiteNodeRepo) GetNodeById(node_id string) (*Node, error) {
 		WHERE id = $1;
 		);`
 
-	statement, err := repo.db.PrepareNamed(query)
+	statement, err := repo.db.Preparex(query)
 	if err != nil {
 		return nil, err
 	}

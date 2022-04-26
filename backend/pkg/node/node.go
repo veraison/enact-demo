@@ -8,10 +8,12 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/gob"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"log"
 	"math/big"
 	"os"
@@ -143,6 +145,75 @@ func swapUint16(n uint16) uint16 {
 	return (n&0x00FF)<<8 | (n&0xFF00)>>8
 }
 
+// Token is the container for the decoded EnactTrust token
+type Token struct {
+	// TPMS_ATTEST decoded from the token
+	AttestationData *tpm2.AttestationData
+	// Raw token bytes
+	Raw []byte
+	// TPMT_SIGNATURE decoded from the token
+	Signature *tpm2.Signature
+}
+
+func (t *Token) Decode(data []byte) error {
+	// The first two bytes are the SIZE of the following TPMS_ATTEST
+	// structure. The following SIZE bytes are the TPMS_ATTEST structure,
+	// the remaining bytes are the signature.
+	if len(data) < 3 {
+		return fmt.Errorf("could not get data size; token too small (%d)", len(data))
+	}
+
+	size := binary.BigEndian.Uint16(data[:2])
+	if len(data) < int(2+size) {
+		return fmt.Errorf("TPMS_ATTEST appears truncated; expected %d, but got %d bytes",
+			size, len(data)-2)
+	}
+
+	var err error
+
+	t.Raw = data[2 : 2+size]
+	t.AttestationData, err = tpm2.DecodeAttestationData(t.Raw)
+	if err != nil {
+		return fmt.Errorf("could not decode TPMS_ATTEST: %v", err)
+	}
+
+	t.Signature, err = tpm2.DecodeSignature(bytes.NewBuffer(data[2+size:]))
+	if err != nil {
+		return fmt.Errorf("could not decode TPMT_SIGNATURE: %v", err)
+	}
+
+	return nil
+}
+
+func (t Token) VerifySignature(key *ecdsa.PublicKey) error {
+	digest := sha256.Sum256(t.Raw)
+
+	if !ecdsa.Verify(key, digest[:], t.Signature.ECC.R, t.Signature.ECC.S) {
+		return fmt.Errorf("failed to verify signature")
+	}
+
+	return nil
+}
+
+func parseKey(keyString string) (*ecdsa.PublicKey, error) {
+	buf, err := base64.StdEncoding.DecodeString(keyString)
+	if err != nil {
+		return nil, err
+	}
+
+	key, err := x509.ParsePKIXPublicKey(buf)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse public key: %v", err)
+	}
+
+	ret, ok := key.(*ecdsa.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("could not extract EC public key; got [%T]: %v", key, err)
+	}
+
+	return ret, nil
+}
+
 func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer, signatureBlob *bytes.Buffer) error {
 	// node, err := n.repo.GetNodeById(nodeID)
 	// if err != nil {
@@ -155,10 +226,10 @@ func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer,
 	// 	return err
 	// }
 
-	wErr := os.WriteFile("reference", concatBuffers(goldenBlob, signatureBlob).Bytes(), 0666)
-	if wErr != nil {
-		log.Println("error outputting blob")
-	}
+	// wErr := os.WriteFile("reference", concatBuffers(goldenBlob, signatureBlob).Bytes(), 0666)
+	// if wErr != nil {
+	// 	log.Println("error outputting blob")
+	// }
 
 	bigEndianBuf := &bytes.Buffer{}
 
@@ -176,16 +247,16 @@ func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer,
 	// Write the big endian num to the buffer
 	binary.Write(bigEndianBuf, binary.BigEndian, sizeBuf)
 
-	log.Println(len(sizeBuf))
+	log.Println("goldenBlob + signature bytes:", len(goldenBlob.Bytes())+len(signatureBlob.Bytes()))
 
-	binary.Write(bigEndianBuf, binary.BigEndian, goldenBlob.Bytes())
-	binary.Write(bigEndianBuf, binary.BigEndian, signatureBlob.Bytes())
+	// binary.Write(bigEndianBuf, binary.BigEndian, goldenBlob.Bytes())
+	// binary.Write(bigEndianBuf, binary.BigEndian, signatureBlob.Bytes())
 
-	writeErr1 := os.WriteFile("reference.blob", bigEndianBuf.Bytes(), 0666)
-	if writeErr1 != nil {
-		log.Println("error outputting blob")
-	}
-	log.Println("wrote blob to file")
+	// writeErr1 := os.WriteFile("reference.blob", bigEndianBuf.Bytes(), 0666)
+	// if writeErr1 != nil {
+	// 	log.Println("error outputting blob")
+	// }
+	// log.Println("wrote blob to file")
 
 	// log.Println("tpmsAttestSize ENCODED")
 	// fmt.Printf("% 08b", bigEndianBuf)
@@ -279,6 +350,33 @@ func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer,
 	binary.Write(bigEndianBuf, binary.BigEndian, tempBuf)
 
 	binary.Write(bigEndianBuf, binary.BigEndian, sigS)
+
+	t := Token{}
+	err := t.Decode(bigEndianBuf.Bytes())
+	if err != nil {
+		log.Println(err)
+	}
+
+	// dimiNodeID := t.AttestationData.ExtraData
+	// log.Println("Dimi's nodeID:", nodeID)
+	// log.Println("Dimi's nodeID:", hex.EncodeToString(dimiNodeID))
+
+	// nodeUUID, err := uuid.Parse(hex.EncodeToString(nodeUUID))
+
+	// node, err := n.repo.GetNodeById(nodeUUID.String())
+	// if err != nil {
+	// 	return err
+	// }
+
+	// key, err := parseKey(node.AK_Pub)
+	// if err != nil {
+	// 	log.Println(err)
+	// }
+
+	// err = t.VerifySignature(key)
+	// if err != nil {
+	// 	return err
+	// }
 
 	// Write to a file
 	writeErr := os.WriteFile("big.blob", bigEndianBuf.Bytes(), 0666)
@@ -375,6 +473,3 @@ func verifySignature(pemStr string, evidenceBlob *bytes.Buffer) (bool, error) {
 
 	return isValid, nil
 }
-
-
-
