@@ -11,6 +11,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/gob"
+	"encoding/hex"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -214,201 +215,7 @@ func parseKey(keyString string) (*ecdsa.PublicKey, error) {
 	return ret, nil
 }
 
-func (n *NodeService) HandleGoldenValue_NO_PARSING(nodeID string, goldenBlob *bytes.Buffer, signatureBlob *bytes.Buffer) error {
-	bigEndianBuf := &bytes.Buffer{}
-
-	/* Parse TPMS_ATTEST */
-	val := goldenBlob.Next(2)
-	tpmsAttestSize := binary.LittleEndian.Uint16(val)
-	// Convert little endian to big endian
-	sizeBuf := make([]byte, 2)
-	binary.BigEndian.PutUint16(sizeBuf, tpmsAttestSize)
-	// Write the big endian num to the buffer
-	binary.Write(bigEndianBuf, binary.BigEndian, sizeBuf)
-
-	// Write the rest to the buf, because it's encoded in big endian
-	binary.Write(bigEndianBuf, binary.BigEndian, goldenBlob.Bytes())
-
-	/* Parse signature struct */
-	// 0. TPMI_ALG_SIG_SCHEME
-	val = signatureBlob.Next(2)
-	sigAlgId := binary.LittleEndian.Uint16(val)
-
-	tempBuf := make([]byte, 2)
-	binary.BigEndian.PutUint16(tempBuf, sigAlgId)
-
-	binary.Write(bigEndianBuf, binary.BigEndian, tempBuf)
-
-	// 1. TPMI_ALG
-	val = signatureBlob.Next(2)
-	tpmiAlgHash := binary.LittleEndian.Uint16(val)
-	// Swap endiannnes of tpmiAlgHash
-	tempBuf = make([]byte, 2)
-	binary.BigEndian.PutUint16(tempBuf, tpmiAlgHash)
-	binary.Write(bigEndianBuf, binary.BigEndian, tempBuf)
-
-	// Parsing signature R
-	val = signatureBlob.Next(2)
-	sizeR := binary.LittleEndian.Uint16(val)
-	sigR := signatureBlob.Next(int(sizeR))
-
-	// Swap endiannnes of sizeR
-	tempBuf = make([]byte, 2)
-	binary.BigEndian.PutUint16(tempBuf, sizeR)
-	binary.Write(bigEndianBuf, binary.BigEndian, tempBuf)
-
-	binary.Write(bigEndianBuf, binary.BigEndian, sigR)
-	
-	// Parsing signature S
-	val = signatureBlob.Next(2)
-	sizeS := binary.LittleEndian.Uint16(val)
-	sigS := signatureBlob.Next(int(sizeS))
-
-	// Swap endiannnes of sizeS
-	tempBuf = make([]byte, 2)
-	binary.BigEndian.PutUint16(tempBuf, sizeS)
-	binary.Write(bigEndianBuf, binary.BigEndian, tempBuf)
-
-	binary.Write(bigEndianBuf, binary.BigEndian, sigS)
-	log.Println("unread bytes of signatureBlob: ", len(signatureBlob.Bytes()))
-
-	log.Println("------")
-
-	log.Println("Size of parsed data buffer: ", len(bigEndianBuf.Bytes()))
-
-	writeErr := os.WriteFile("big.blob", bigEndianBuf.Bytes(), 0666)
-	if writeErr != nil {
-		log.Println("error outputting blob")
-	}
-	log.Println("wrote blob to file")
-
-	return nil
-}
-
-func (n *NodeService) HandleGoldenValueIMPROVED(nodeID string, goldenBlob *bytes.Buffer, signatureBlob *bytes.Buffer) error {
-	bigEndianBuf := &bytes.Buffer{}
-
-	/* Parse TPMS_ATTEST */
-	val := goldenBlob.Next(2)
-	tpmsAttestSize := binary.LittleEndian.Uint16(val)
-	// Convert little endian to big endian
-	sizeBuf := make([]byte, 2)
-	binary.BigEndian.PutUint16(sizeBuf, tpmsAttestSize)
-	// Write the big endian num to the buffer
-	binary.Write(bigEndianBuf, binary.BigEndian, sizeBuf)
-
-	// 1. TPM_Magic
-	val = goldenBlob.Next(4)
-	tpmMagic := binary.BigEndian.Uint32(val)
-
-	sizeBuf = make([]byte, 4)
-	binary.BigEndian.PutUint32(sizeBuf, tpmMagic)
-
-	binary.Write(bigEndianBuf, binary.BigEndian, tpmMagic)
-
-	// 2. attest type
-	val = goldenBlob.Next(2)
-	attestType := binary.BigEndian.Uint16(val)
-	binary.Write(bigEndianBuf, binary.BigEndian, attestType)
-
-	// 3. qualifiedData
-	val = goldenBlob.Next(2)
-	nestedBufferSize := binary.BigEndian.Uint16(val)
-	qualifiedData := goldenBlob.Next(int(nestedBufferSize))
-
-	binary.Write(bigEndianBuf, binary.BigEndian, nestedBufferSize)
-	binary.Write(bigEndianBuf, binary.BigEndian, qualifiedData)
-
-	// 4. extra data
-	val = goldenBlob.Next(2)
-	nestedBufferSize = binary.BigEndian.Uint16(val)
-	extraData := goldenBlob.Next(int(nestedBufferSize))
-
-	binary.Write(bigEndianBuf, binary.BigEndian, nestedBufferSize)
-	binary.Write(bigEndianBuf, binary.BigEndian, extraData)
-
-	// 5. digest
-	val = goldenBlob.Next(2)
-	digestSize := binary.BigEndian.Uint16(val)
-	evidenceDigest := goldenBlob.Next(int(digestSize))
-
-	binary.Write(bigEndianBuf, binary.BigEndian, digestSize)
-	binary.Write(bigEndianBuf, binary.BigEndian, evidenceDigest)
-
-	log.Println("unread bytes of goldenBlob: ", len(goldenBlob.Bytes()))
-
-	/* Parse signature struct */
-	// 0. TPMI_ALG_SIG_SCHEME
-	val = signatureBlob.Next(2)
-	sigAlgId := binary.LittleEndian.Uint16(val)
-
-	tempBuf := make([]byte, 2)
-	binary.BigEndian.PutUint16(tempBuf, sigAlgId)
-
-	binary.Write(bigEndianBuf, binary.BigEndian, tempBuf)
-
-	// 1. TPMI_ALG
-	val = signatureBlob.Next(2)
-	tpmiAlgHash := binary.LittleEndian.Uint16(val)
-	// Swap endiannnes of tpmiAlgHash
-	tempBuf = make([]byte, 2)
-	binary.BigEndian.PutUint16(tempBuf, tpmiAlgHash)
-	binary.Write(bigEndianBuf, binary.BigEndian, tempBuf)
-
-	// Parsing signature R
-	val = signatureBlob.Next(2)
-	sizeR := binary.LittleEndian.Uint16(val)
-	sigR := signatureBlob.Next(int(sizeR))
-
-	// Swap endiannnes of sizeR
-	tempBuf = make([]byte, 2)
-	binary.BigEndian.PutUint16(tempBuf, sizeR)
-	binary.Write(bigEndianBuf, binary.BigEndian, tempBuf)
-
-	binary.Write(bigEndianBuf, binary.BigEndian, sigR)
-
-	// Parsing signature S
-	val = signatureBlob.Next(2)
-	sizeS := binary.LittleEndian.Uint16(val)
-	sigS := signatureBlob.Next(int(sizeS))
-
-	// Swap endiannnes of sizeS
-	tempBuf = make([]byte, 2)
-	binary.BigEndian.PutUint16(tempBuf, sizeS)
-	binary.Write(bigEndianBuf, binary.BigEndian, tempBuf)
-
-	binary.Write(bigEndianBuf, binary.BigEndian, sigS)
-	log.Println("unread bytes of signatureBlob: ", len(signatureBlob.Bytes()))
-
-	log.Println("------")
-
-	log.Println("Size of parsed data buffer: ", len(bigEndianBuf.Bytes()))
-
-	writeErr := os.WriteFile("big.blob", bigEndianBuf.Bytes(), 0666)
-	if writeErr != nil {
-		log.Println("error outputting blob")
-	}
-	log.Println("wrote blob to file")
-
-	return nil
-}
-
 func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer, signatureBlob *bytes.Buffer) error {
-	// node, err := n.repo.GetNodeById(nodeID)
-	// if err != nil {
-	// 	return err
-	// }
-	// log.Println(node)
-
-	// _, err = verifySignature(node.AK_Pub, signatureBlob)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// wErr := os.WriteFile("reference", concatBuffers(goldenBlob, signatureBlob).Bytes(), 0666)
-	// if wErr != nil {
-	// 	log.Println("error outputting blob")
-	// }
 	log.Println("goldenBlob + signature bytes:", len(goldenBlob.Bytes())+len(signatureBlob.Bytes()))
 
 	bigEndianBuf := &bytes.Buffer{}
@@ -419,74 +226,48 @@ func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer,
 
 	// 0. TPMS_ATTEST Size
 	val := goldenBlob.Next(2)
-
 	tpmsAttestSize := binary.LittleEndian.Uint16(val)
-
-	// Convert little endian to big endian
+	// Convert to Big Endian
 	sizeBuf := make([]byte, 2)
 	binary.BigEndian.PutUint16(sizeBuf, tpmsAttestSize)
-
-	// Write the big endian num to the buffer
+	// Write the Big Endian byte array to the buffer
 	binary.Write(bigEndianBuf, binary.BigEndian, sizeBuf)
-
 	log.Println(len(bigEndianBuf.Bytes()))
-
-	// binary.Write(bigEndianBuf, binary.BigEndian, goldenBlob.Bytes())
-	// binary.Write(bigEndianBuf, binary.BigEndian, signatureBlob.Bytes())
-
-	// writeErr1 := os.WriteFile("reference.blob", bigEndianBuf.Bytes(), 0666)
-	// if writeErr1 != nil {
-	// 	log.Println("error outputting blob")
-	// }
-	// log.Println("wrote blob to file")
-
-	// log.Println("tpmsAttestSize ENCODED")
-	// fmt.Printf("% 08b", bigEndianBuf)
-	// log.Println("")
 
 	// 1. TPM_Magic
 	val = goldenBlob.Next(4)
 	tpmMagic := binary.BigEndian.Uint32(val)
-
-	sizeBuf = make([]byte, 4)
-	binary.BigEndian.PutUint32(sizeBuf, tpmMagic)
-
+	// Data is already Big Endian, writing directly to buffer
 	binary.Write(bigEndianBuf, binary.BigEndian, tpmMagic)
-
 	log.Println(len(bigEndianBuf.Bytes()))
 
 	// 2. attest type
 	val = goldenBlob.Next(2)
 	attestType := binary.BigEndian.Uint16(val)
-
+	// Data is already Big Endian
 	binary.Write(bigEndianBuf, binary.BigEndian, attestType)
-
 	log.Println(len(bigEndianBuf.Bytes()))
 
-	// 3. qualifiedData
+	// 3. qualifiedSigner
 	val = goldenBlob.Next(2)
 	nestedBufferSize := binary.BigEndian.Uint16(val)
-	qualifiedData := goldenBlob.Next(int(nestedBufferSize))
-
+	qualifiedSigner := goldenBlob.Next(int(nestedBufferSize))
+	// Size field is already Big Endian
 	binary.Write(bigEndianBuf, binary.BigEndian, nestedBufferSize)
-
 	log.Println(len(bigEndianBuf.Bytes()))
-
-	binary.Write(bigEndianBuf, binary.BigEndian, qualifiedData)
-
+	// Qualified buffer is already Big Endian
+	binary.Write(bigEndianBuf, binary.BigEndian, qualifiedSigner)
 	log.Println(len(bigEndianBuf.Bytes()))
 
 	// 4. extra data - node_id
 	val = goldenBlob.Next(2)
 	nestedBufferSize = binary.BigEndian.Uint16(val)
 	extraData := goldenBlob.Next(int(nestedBufferSize))
-
+	// Size field is already Big Endian
 	binary.Write(bigEndianBuf, binary.BigEndian, nestedBufferSize)
-
 	log.Println(len(bigEndianBuf.Bytes()))
-
+	// Extra data buffer is already Big Endian
 	binary.Write(bigEndianBuf, binary.BigEndian, extraData)
-
 	log.Println(len(bigEndianBuf.Bytes()))
 
 	// 5. Digest
@@ -494,13 +275,11 @@ func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer,
 	// TODO: check digestSize, should usually be 24 bytes for SHA-256
 	digestSize := binary.BigEndian.Uint16(val)
 	evidenceDigest := goldenBlob.Next(int(digestSize))
-
+	// Size field is already Big Endian
 	binary.Write(bigEndianBuf, binary.BigEndian, digestSize)
-
 	log.Println(len(bigEndianBuf.Bytes()))
-
+	// Digest is already Big Endian
 	binary.Write(bigEndianBuf, binary.BigEndian, evidenceDigest)
-
 	log.Println(len(bigEndianBuf.Bytes()))
 
 	/* Parse signature struct */
@@ -509,12 +288,11 @@ func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer,
 	// 0. TPMI_ALG_SIG_SCHEME
 	val = signatureBlob.Next(2)
 	sigAlgId := binary.LittleEndian.Uint16(val)
-
+	// Convert to Big Endian
 	tempBuf := make([]byte, 2)
 	binary.BigEndian.PutUint16(tempBuf, sigAlgId)
-
+	// Write the Big Endian byte array to buffer
 	binary.Write(bigEndianBuf, binary.BigEndian, tempBuf)
-
 	log.Println(len(bigEndianBuf.Bytes()))
 
 	// 1. TPMU_SIGNATURE
@@ -530,7 +308,6 @@ func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer,
 	tempBuf = make([]byte, 2)
 	binary.BigEndian.PutUint16(tempBuf, tpmiAlgHash)
 	binary.Write(bigEndianBuf, binary.BigEndian, tempBuf)
-
 	log.Println(len(bigEndianBuf.Bytes()))
 
 	// Parsing signature R
@@ -541,12 +318,11 @@ func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer,
 	// Swap endiannnes of sizeR
 	tempBuf = make([]byte, 2)
 	binary.BigEndian.PutUint16(tempBuf, sizeR)
+	// Size field
 	binary.Write(bigEndianBuf, binary.BigEndian, tempBuf)
-
 	log.Println(len(bigEndianBuf.Bytes()))
-
+	// SigR part
 	binary.Write(bigEndianBuf, binary.BigEndian, sigR)
-
 	log.Println(len(bigEndianBuf.Bytes()))
 
 	// Parsing signature S
@@ -557,40 +333,42 @@ func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer,
 	// Swap endiannnes of sizeS
 	tempBuf = make([]byte, 2)
 	binary.BigEndian.PutUint16(tempBuf, sizeS)
+	// Size field
 	binary.Write(bigEndianBuf, binary.BigEndian, tempBuf)
-
 	log.Println(len(bigEndianBuf.Bytes()))
-
+	// SigS part
 	binary.Write(bigEndianBuf, binary.BigEndian, sigS)
-
 	log.Println(len(bigEndianBuf.Bytes()))
 
-	// t := Token{}
-	// err := t.Decode(bigEndianBuf.Bytes())
-	// if err != nil {
-	// 	log.Println(err)
-	// }
+	t := Token{}
+	err := t.Decode(bigEndianBuf.Bytes())
+	if err != nil {
+		log.Println(err)
+	}
 
-	// dimiNodeID := t.AttestationData.ExtraData
-	// log.Println("Dimi's nodeID:", nodeID)
-	// log.Println("Dimi's nodeID:", hex.EncodeToString(dimiNodeID))
+	// Extract nodeID from ExtraData
+	dimiNodeID := uuid.FromBytesOrNil(t.AttestationData.ExtraData)
+	log.Println("Dimi's nodeID:", nodeID)
+	log.Println("Dimi's nodeID:", hex.EncodeToString(dimiNodeID))
 
-	// nodeUUID, err := uuid.Parse(hex.EncodeToString(nodeUUID))
+	node, err := n.repo.GetNodeById(dimiNodeID.String())
+	if err != nil {
+		return err
+	}
 
-	// node, err := n.repo.GetNodeById(nodeUUID.String())
-	// if err != nil {
-	// 	return err
-	// }
+	key, err := parseKey(node.AK_Pub)
+	if err != nil {
+		log.Println(err)
+	}
 
-	// key, err := parseKey(node.AK_Pub)
-	// if err != nil {
-	// 	log.Println(err)
-	// }
-
-	// err = t.VerifySignature(key)
-	// if err != nil {
-	// 	return err
-	// }
+	err = t.VerifySignature(key)
+	if err != nil {
+		return err
+	} else {
+		log.Println("Signature check is GOOD.")
+		//Store golden PCR value in Enact DB
+		//Mark node as onboarded
+	}
 
 	// Write to a file
 	writeErr := os.WriteFile("big.blob", bigEndianBuf.Bytes(), 0666)
@@ -609,6 +387,8 @@ func (n *NodeService) HandleEvidence(nodeID string, evidenceBlob *bytes.Buffer, 
 	}
 
 	log.Println(node)
+
+	/* Similar to Golden endpoint, parse evidenceBlog as goldenBlob and signatureBlob the same */
 
 	// First we need to see if the data source is legit
 	_, err = verifySignature(node.AK_Pub, signatureBlob)
