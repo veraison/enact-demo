@@ -89,6 +89,7 @@ func setupRoutes(nodeService *node.NodeService) *gin.Engine {
 				"error": err.Error(),
 			})
 		} else {
+			log.Println(nodeID.String())
 			c.String(201, nodeID.String())
 		}
 	})
@@ -147,7 +148,7 @@ func setupRoutes(nodeService *node.NodeService) *gin.Engine {
 			})
 		}
 
-		err = nodeService.HandleGoldenValue(nodeID, golden_blob_buf, signature_blob_buf)
+		err = nodeService.HandleGoldenValue_NO_PARSING(nodeID, golden_blob_buf, signature_blob_buf)
 		if err != nil {
 			log.Println(err.Error())
 			c.JSON(500, gin.H{
