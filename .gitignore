@@ -13,3 +13,10 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+
+# Other
+node_modules
+.env
+.DS_Store
+workspace.code-workspace
+*.blob
