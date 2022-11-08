@@ -66,7 +66,7 @@ func main() {
 
 	ar, err := phase2(cfg)
 	if err != nil {
-		log.Fatalf("phase1: %v", err)
+		log.Fatalf("phase2: %v", err)
 	}
 
 	fmt.Println("attestation result: ", string(ar))
