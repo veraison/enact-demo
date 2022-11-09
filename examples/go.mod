@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/google/uuid v1.3.0
-	github.com/veraison/apiclient v0.0.3
+	github.com/veraison/apiclient v0.0.4
 	github.com/veraison/corim v0.0.0-20211208184228-467df6558f2c
 	github.com/veraison/swid v0.0.1-beta.6
 )
