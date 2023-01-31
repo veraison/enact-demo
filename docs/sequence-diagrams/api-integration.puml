@@ -31,9 +31,8 @@ group golden values provisioning
 	Node -> Node: Decrypt(EK_priv, challenge-blob) -> "the-challenge"
 	Node -> Node: TPM2_Quote("the-challenge", PCR23) -> golden
 	Node -> BE: POST /node/golden, Body: {nodeID, golden}
-	BE -> V_EviVfy: POST /session/123, C-T: application/vnd.enacttrust.tpm-evidence; \n Body: {TPMS_ATTEST_LENGTH || TPMS_ATTEST || TPMT_SIGNATURE }
+	BE -> V_EviVfy: POST /session/123, C-T: application/vnd.enacttrust.tpm-evidence; \n Body: {nodeID || TPMS_ATTEST_LENGTH || TPMS_ATTEST || TPMT_SIGNATURE }
 	V_EviVfy -> V_EviVfy: Extract the-challenge from TPMS_ATTEST.extraData
-	V_EviVfy -> V_EviVfy: Extract nodeID from TPMS_ATTEST.extraData
 	V_EviVfy -> V_EndStore: lookupKeys(nodeID)
 	V_EndStore -> V_EviVfy: AK_pub
 	V_EviVfy -> V_EviVfy: Verify(AK_pub, TPMS_ATTEST, TPMT_SIGNATURE)
@@ -63,9 +62,8 @@ group periodic evidence submission
 	Node -> Node: Decrypt(EK_priv, challenge-blob) -> "another-challenge"
 	Node -> Node: TPM2_Quote("another-challenge", PCR23) -> evidence
 	Node -> BE: POST /node/evidence, Body: {nodeID, evidence)}
-	BE -> V_EviVfy: POST /session/456, C-T: application/vnd.enacttrust.tpm-evidence; \n Body: {TPMS_ATTEST_LENGTH || TPMS_ATTEST || TPMT_SIGNATURE }
+	BE -> V_EviVfy: POST /session/456, C-T: application/vnd.enacttrust.tpm-evidence; \n Body: {nodeID || TPMS_ATTEST_LENGTH || TPMS_ATTEST || TPMT_SIGNATURE }
 	V_EviVfy -> V_EviVfy: Extract another-challenge from TPMS_ATTEST.extraData
-	V_EviVfy -> V_EviVfy: Extract nodeID from TPMS_ATTEST.extraData
 	V_EviVfy -> V_EndStore: lookupKeys(nodeID)
 	V_EndStore -> V_EviVfy: AK_pub
 	V_EviVfy -> V_EviVfy: Verify(AK_pub, TPMS_ATTEST, TPMT_SIGNATURE)
