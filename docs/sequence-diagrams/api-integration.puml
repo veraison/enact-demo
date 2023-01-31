@@ -24,8 +24,8 @@ group golden values provisioning
 	Node -> BE: POST /node/secret, Body: {nodeID}
 	BE -> V_EviVfy: POST /newSession
 	V_EviVfy -> V_EviVfy: /session/123=>{"nonce"="the-challenge", ...}
-	BE -> BE: Encrypt(EK_pub, "the-challenge") -> challenge-blob
 	V_EviVfy -> BE: Status: 201, Location: /session/123, Body: {challenge-blob, ...}
+	BE -> BE: Encrypt(EK_pub, "the-challenge") -> challenge-blob
 	BE -> Node: Status: 201, Body: {challenge-blob}
 
 	Node -> Node: Decrypt(EK_priv, challenge-blob) -> "the-challenge"
@@ -55,8 +55,8 @@ end
 group periodic evidence submission
 	Node -> BE: POST /node/secret, Body: {nodeID}
 	BE -> V_EviVfy: POST /newSession
-	V_EviVfy -> BE: Status: 201, Location: /session/456, Body: {"nonce"="another-challenge", ...}
 	V_EviVfy -> V_EviVfy: /session/456=>{"nonce"="another-challenge", ...}
+	V_EviVfy -> BE: Status: 201, Location: /session/456, Body: {"nonce"="another-challenge", ...}
 	BE -> BE: Encrypt(EK_pub, "another-challenge") -> challenge-blob
 	BE -> Node: Status: 201, Body: {challenge-blob}
 
