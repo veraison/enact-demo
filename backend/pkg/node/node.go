@@ -11,7 +11,6 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/gob"
-	"encoding/hex"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -346,10 +345,15 @@ func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer,
 		log.Println(err)
 	}
 
+	// TODO: read secret from here
 	// Extract nodeID from ExtraData
-	dimiNodeID := uuid.FromBytesOrNil(t.AttestationData.ExtraData)
+	dimiNodeID, err := uuid.FromBytes(t.AttestationData.ExtraData)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
 	log.Println("Dimi's nodeID:", nodeID)
-	log.Println("Dimi's nodeID:", hex.EncodeToString(dimiNodeID))
+	log.Println("Dimi's nodeID:", dimiNodeID.String())
 
 	node, err := n.repo.GetNodeById(dimiNodeID.String())
 	if err != nil {

@@ -8,6 +8,15 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/veraison/enact-demo/pkg/db"
 	"github.com/veraison/enact-demo/pkg/node"
+	"github.com/veraison/enact-demo/pkg/veraison"
+)
+
+var (
+	EntryPoint           = "http://localhost:8080/challenge-response/v1/newSession"
+	VeraisonSessionTable = map[string]string{}
+	FakeNodeID           = "7dd5db06-d2f5-4e0d-8a9c-9baaa5a446ef"
+	FakeGolden           = []byte{0x00, 0x01, 0x02, 0x03}
+	TPMEvidenceMediaType = "application/vnd.enacttrust.tpm-evidence"
 )
 
 func setupServices() *node.NodeService {
@@ -28,7 +37,6 @@ func setupServices() *node.NodeService {
 	return nodeService
 }
 
-// TODO: Move into controller
 func setupRoutes(nodeService *node.NodeService) *gin.Engine {
 	// Init with the Logger and Recovery middleware already attached
 	r := gin.Default()
@@ -50,6 +58,9 @@ func setupRoutes(nodeService *node.NodeService) *gin.Engine {
 				"error": err.Error(),
 			})
 		}
+
+		ak_name := c.PostForm("ak_name")
+		log.Println(ak_name)
 
 		// Allocate buffers, so we can read the files
 		ak_pub_buf := bytes.NewBuffer(nil)
@@ -80,7 +91,7 @@ func setupRoutes(nodeService *node.NodeService) *gin.Engine {
 		if err != nil {
 			log.Println(err.Error())
 		}
-
+		// TODO: SESSION - store ak_name and ek_pub, so we can use them in /node/secret
 		// Handle first step of node onboarding
 		nodeID, err := nodeService.HandleReceivePEM(ak_pub_buf.String(), ek_pub_buf.String())
 		if err != nil {
@@ -94,9 +105,45 @@ func setupRoutes(nodeService *node.NodeService) *gin.Engine {
 		}
 	})
 
+	r.POST("/node/secret", func(c *gin.Context) {
+		nodeID := c.PostForm("node_id")
+
+		// 1. call Veraison frontend
+		// 2. TODO: encrypt the nonce (the challenge) returned by Veraison
+		// 3. store the session_id (regenerated on every call to /session) to make calls later
+		sessionCtx, sessionURI, err := veraison.CreateVeraisonSession()
+		if err != nil {
+			log.Println(err.Error())
+			// 500 = Session or challenge creation failed
+			c.JSON(500, gin.H{
+				"error": err.Error(),
+			})
+		} else {
+			log.Println("nonce:", sessionCtx.Nonce)
+			log.Println(`sessionURI: `, sessionURI)
+
+			// TODO: step 2. encrypt challenge
+			encryptedChallenge, err := veraison.EncryptChallenge(sessionCtx.Nonce, ak_name, ek_pub)
+			if err != nil {
+				log.Println(err.Error())
+				// 500 = Session or challenge creation failed
+				c.JSON(500, gin.H{
+					"error": err.Error(),
+				})
+			}
+			_ = encryptedChallenge
+
+			// store session_id and associate it with node_id, so we can use it later to call Veraison
+			VeraisonSessionTable[nodeID] = sessionURI
+
+			// On success -> write 204 and return the encrypted challenge []byte
+			c.Writer.WriteHeader(204)
+			c.Writer.Write(encryptedChallenge)
+		}
+	})
+
 	// Note: ./agent onboard -> sends PEM, then sends GOLDEN
 	// ./agent -> sends EVIDENCE
-
 	r.POST("/node/golden", func(c *gin.Context) {
 		// body param
 		nodeID := c.PostForm("node_id")
@@ -148,7 +195,7 @@ func setupRoutes(nodeService *node.NodeService) *gin.Engine {
 			})
 		}
 
-		err = nodeService.HandleGoldenValue_NO_PARSING(nodeID, golden_blob_buf, signature_blob_buf)
+		err = nodeService.HandleGoldenValue(nodeID, golden_blob_buf, signature_blob_buf)
 		if err != nil {
 			log.Println(err.Error())
 			c.JSON(500, gin.H{
