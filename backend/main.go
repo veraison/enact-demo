@@ -131,7 +131,6 @@ func setupRoutes(nodeService *node.NodeService) *gin.Engine {
 					"error": err.Error(),
 				})
 			}
-			_ = encryptedChallenge
 
 			// store session_id and associate it with node_id, so we can use it later to call Veraison
 			VeraisonSessionTable[nodeID] = sessionURI

@@ -221,10 +221,16 @@ func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer,
 
 	log.Println(len(bigEndianBuf.Bytes()))
 
-	/* Parse TPMS_ATTEST */
+	// Read 16 byte node_id from the beginning of the whole blob
+	val := goldenBlob.Next(16)
+	agentNodeId, err := uuid.FromBytes(val)
+	if err != nil {
+		log.Println(err)
+	}
 
+	/* Parse TPMS_ATTEST */
 	// 0. TPMS_ATTEST Size
-	val := goldenBlob.Next(2)
+	val = goldenBlob.Next(2)
 	tpmsAttestSize := binary.LittleEndian.Uint16(val)
 	// Convert to Big Endian
 	sizeBuf := make([]byte, 2)
@@ -258,7 +264,7 @@ func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer,
 	binary.Write(bigEndianBuf, binary.BigEndian, qualifiedSigner)
 	log.Println(len(bigEndianBuf.Bytes()))
 
-	// 4. extra data - node_id
+	// 4. extra data - secret nonce
 	val = goldenBlob.Next(2)
 	nestedBufferSize = binary.BigEndian.Uint16(val)
 	extraData := goldenBlob.Next(int(nestedBufferSize))
@@ -340,22 +346,16 @@ func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer,
 	log.Println(len(bigEndianBuf.Bytes()))
 
 	t := Token{}
-	err := t.Decode(bigEndianBuf.Bytes())
+	err = t.Decode(bigEndianBuf.Bytes())
 	if err != nil {
 		log.Println(err)
 	}
 
-	// TODO: read secret from here
-	// Extract nodeID from ExtraData
-	dimiNodeID, err := uuid.FromBytes(t.AttestationData.ExtraData)
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-	log.Println("Dimi's nodeID:", nodeID)
-	log.Println("Dimi's nodeID:", dimiNodeID.String())
+	// Read secret (nonce) from extraData
+	nonce := extraData
+	log.Println("nonce:", nonce)
 
-	node, err := n.repo.GetNodeById(dimiNodeID.String())
+	node, err := n.repo.GetNodeById(agentNodeId.String())
 	if err != nil {
 		return err
 	}
