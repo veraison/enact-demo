@@ -25,7 +25,7 @@ group golden values provisioning
 	BE -> V_EviVfy: POST /newSession
 	V_EviVfy -> V_EviVfy: /session/123=>{"nonce"="the-challenge", ...}
 	V_EviVfy -> BE: Status: 201, Location: /session/123, Body: {"nonce"="the-challenge", ...}
-	BE -> Node: Status: 201, Body: {challenge-blob}
+	BE -> Node: Status: 201, Body: {the-challenge}
 
 	Node -> Node: TPM2_Quote("the-challenge", PCR23) -> golden
 	Node -> BE: POST /node/golden, Body: {nodeID, golden}
@@ -54,7 +54,7 @@ group periodic evidence submission
 	BE -> V_EviVfy: POST /newSession
 	V_EviVfy -> V_EviVfy: /session/456=>{"nonce"="another-challenge", ...}
 	V_EviVfy -> BE: Status: 201, Location: /session/456, Body: {"nonce"="another-challenge", ...}
-	BE -> Node: Status: 201, Body: {challenge-blob}
+	BE -> Node: Status: 201, Body: {another-challenge}
 
 	Node -> Node: TPM2_Quote("another-challenge", PCR23) -> evidence
 	Node -> BE: POST /node/evidence, Body: {nodeID, evidence)}
