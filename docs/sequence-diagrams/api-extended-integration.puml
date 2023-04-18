@@ -25,8 +25,10 @@ group golden values provisioning
 	BE -> V_EviVfy: POST /newSession
 	V_EviVfy -> V_EviVfy: /session/123=>{"nonce"="the-challenge", ...}
 	V_EviVfy -> BE: Status: 201, Location: /session/123, Body: {"nonce"="the-challenge", ...}
-	BE -> Node: Status: 201, Body: {the-challenge}
+	BE -> BE: Encrypt(EK_pub, "the-challenge") -> challenge-blob
+	BE -> Node: Status: 201, Body: {challenge-blob}
 
+	Node -> Node: Decrypt(EK_priv, challenge-blob) -> "the-challenge"
 	Node -> Node: TPM2_Quote("the-challenge", PCR23) -> golden
 	Node -> BE: POST /node/golden, Body: {nodeID, golden}
 	BE -> V_EviVfy: POST /session/123, C-T: application/vnd.enacttrust.tpm-evidence; \n Body: {nodeID || TPMS_ATTEST_LENGTH || TPMS_ATTEST || TPMT_SIGNATURE }
@@ -54,8 +56,10 @@ group periodic evidence submission
 	BE -> V_EviVfy: POST /newSession
 	V_EviVfy -> V_EviVfy: /session/456=>{"nonce"="another-challenge", ...}
 	V_EviVfy -> BE: Status: 201, Location: /session/456, Body: {"nonce"="another-challenge", ...}
-	BE -> Node: Status: 201, Body: {another-challenge}
+	BE -> BE: Encrypt(EK_pub, "another-challenge") -> challenge-blob
+	BE -> Node: Status: 201, Body: {challenge-blob}
 
+	Node -> Node: Decrypt(EK_priv, challenge-blob) -> "another-challenge"
 	Node -> Node: TPM2_Quote("another-challenge", PCR23) -> evidence
 	Node -> BE: POST /node/evidence, Body: {nodeID, evidence)}
 	BE -> V_EviVfy: POST /session/456, C-T: application/vnd.enacttrust.tpm-evidence; \n Body: {nodeID || TPMS_ATTEST_LENGTH || TPMS_ATTEST || TPMT_SIGNATURE }
