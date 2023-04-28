@@ -3,10 +3,12 @@ package enactcorim
 import (
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/google/uuid"
 	"github.com/veraison/corim/comid"
 	"github.com/veraison/corim/corim"
+	"github.com/veraison/swid"
 )
 
 var (
@@ -16,7 +18,7 @@ var (
     "profiles": [
       "https://enacttrust.com/veraison/1.0.0"
     ]
-}	
+}
 `
 	AKComidTemplate = `
 {
@@ -47,6 +49,36 @@ var (
   }
 }
 `
+	gvComidTemplate = `
+	{
+		"tag-identity": {
+		  "id": "00000000-0000-0000-0000-000000000000"
+		},
+		"entities": [
+		  {
+			"name": "EnactTrust",
+			"regid": "https://enacttrust.com",
+			"roles": [ "tagCreator", "creator", "maintainer" ]
+		  }
+		],
+		"triples": {
+		  "reference-values": [
+			{
+			  "environment": {
+				"instance": {
+				  "type": "uuid",
+				  "value": "97ACE407-DE30-0000-0000-097ACE407DE3"
+				}
+			  },
+			  "measurements": [
+				{
+				}
+			  ]
+			}
+		  ]
+		}
+	  }
+	`
 )
 
 func buildCorim(template string, c *comid.Comid) (*corim.UnsignedCorim, error) {
@@ -86,4 +118,48 @@ func RepackageNodePEM(akPub string, nodeID uuid.UUID) (*corim.UnsignedCorim, err
 	}
 
 	return buildCorim(CorimTemplate, &c)
+}
+
+func goldenValues(
+	algID uint64, digest []byte, nodeID uuid.UUID, comidTemplate, corimTemplate string,
+) (*corim.UnsignedCorim, error) {
+	c := comid.Comid{}
+
+	if err := c.FromJSON([]byte(comidTemplate)); err != nil {
+		return nil, fmt.Errorf("parsing CoMID JSON template: %s (%w)", comidTemplate, err)
+	}
+
+	gv := (*c.Triples.ReferenceValues)[0]
+
+	if gv.Environment.Instance.SetUUID(nodeID) == nil {
+		return nil, fmt.Errorf("cannot set nodeID")
+	}
+
+	if gv.Measurements[0].AddDigest(algID, digest) == nil {
+		return nil, fmt.Errorf("cannot set golden value")
+	}
+
+	return buildCorim(corimTemplate, &c)
+}
+
+func RepackageEvidence(nodeID string, evidenceDigest []byte) ([]byte, error) {
+	var algID = swid.Sha256
+	corim, err := goldenValues(algID, evidenceDigest, nodeID, gvComidTemplate, corimTemplate)
+	if err != nil {
+		log.Fatal(err)
+		return nil, err
+	}
+
+	log.Println(`successfully repacked evidence as corim`)
+
+	cbor, err := corim.ToCBOR()
+	if err != nil {
+		log.Fatal(err)
+		return nil, err
+	}
+
+	log.Println(`successfully converted corim to cbor`)
+
+	fmt.Printf("\n>> golden values: %x\n", cbor)
+	return cbor, nil
 }

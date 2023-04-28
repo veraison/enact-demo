@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/gin-gonic/gin"
+	"github.com/veraison/apiclient/verification"
 	"github.com/veraison/enact-demo/pkg/db"
 	"github.com/veraison/enact-demo/pkg/node"
 	"github.com/veraison/enact-demo/pkg/veraison"
@@ -18,6 +19,8 @@ var (
 	FakeGolden           = []byte{0x00, 0x01, 0x02, 0x03}
 	TPMEvidenceMediaType = "application/vnd.enacttrust.tpm-evidence"
 )
+
+var globalCfg *verification.ChallengeResponseConfig
 
 func setupServices() *node.NodeService {
 	// TODO: Load env vars from config
@@ -111,7 +114,10 @@ func setupRoutes(nodeService *node.NodeService) *gin.Engine {
 		// 1. call Veraison frontend
 		// 2. TODO: encrypt the nonce (the challenge) returned by Veraison
 		// 3. store the session_id (regenerated on every call to /session) to make calls later
-		sessionCtx, sessionURI, err := veraison.CreateVeraisonSession()
+		cfg, sessionCtx, sessionURI, err := veraison.CreateVeraisonSession()
+
+		globalCfg = cfg
+
 		if err != nil {
 			log.Println(err.Error())
 			// 500 = Session or challenge creation failed
@@ -122,22 +128,12 @@ func setupRoutes(nodeService *node.NodeService) *gin.Engine {
 			log.Println("nonce:", sessionCtx.Nonce)
 			log.Println(`sessionURI: `, sessionURI)
 
-			// TODO: step 2. encrypt challenge
-			encryptedChallenge, err := veraison.EncryptChallenge(sessionCtx.Nonce, ak_name, ek_pub)
-			if err != nil {
-				log.Println(err.Error())
-				// 500 = Session or challenge creation failed
-				c.JSON(500, gin.H{
-					"error": err.Error(),
-				})
-			}
-
 			// store session_id and associate it with node_id, so we can use it later to call Veraison
 			VeraisonSessionTable[nodeID] = sessionURI
 
-			// On success -> write 204 and return the encrypted challenge []byte
+			// On success -> write 204 and return the challenge []byte to the agent
 			c.Writer.WriteHeader(204)
-			c.Writer.Write(encryptedChallenge)
+			c.Writer.Write(sessionCtx.Nonce)
 		}
 	})
 
@@ -194,13 +190,14 @@ func setupRoutes(nodeService *node.NodeService) *gin.Engine {
 			})
 		}
 
-		err = nodeService.HandleGoldenValue(nodeID, golden_blob_buf, signature_blob_buf)
+		evidenceDigest, err := nodeService.HandleGoldenValue(nodeID, golden_blob_buf, signature_blob_buf)
 		if err != nil {
 			log.Println(err.Error())
 			c.JSON(500, gin.H{
 				"error": err.Error(),
 			})
 		} else {
+			err = nodeService.RouteEvidenceToVeraison(globalCfg, VeraisonSessionTable[nodeID], nodeID, golden_blob_buf, signature_blob_buf, evidenceDigest)
 			c.Status(201)
 		}
 	})

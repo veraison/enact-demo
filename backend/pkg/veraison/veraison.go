@@ -9,6 +9,8 @@ import (
 	"github.com/veraison/apiclient/verification"
 )
 
+var TPMEvidenceMediaType = "application/vnd.enacttrust.tpm-evidence"
+
 // TODO: this needs to contain the concatenated nodeID in the beginning of
 // TPMS_ATTEST. This should be called after processing the evidence
 func SendTPMEvidenceToVeraison(cbor []byte) error {
@@ -46,8 +48,27 @@ func SendPEMToVeraison(cbor []byte) error {
 	return nil
 }
 
+func SendEvidenceAndSignature(cfg *verification.ChallengeResponseConfig, sessionId string, data []byte) ([]byte, error) {
+	// TODO: check if the session exists
+	// if !ok {
+	// 	return nil, fmt.Errorf("no session URI found for node %q", FakeNodeID)
+	// }
+
+	// extract golden values from body
+	attestationResultJSON, err := cfg.ChallengeResponse(data, TPMEvidenceMediaType, sessionId)
+	if err != nil {
+		return nil, fmt.Errorf("challenge-response session failed: %v", err)
+	}
+
+	return attestationResultJSON, nil
+}
+
+func SendEvidenceCborToVeraison(cbor []byte) error {
+	return nil
+}
+
 // TODO: SESSION - call api-agent - should get 201 response from Veraison frontend
-func CreateVeraisonSession() (*verification.ChallengeResponseSession, string, error) {
+func CreateVeraisonSession() (*verification.ChallengeResponseConfig, *verification.ChallengeResponseSession, string, error) {
 	// localhost?
 	var sessionURI = "http://veraison.example/challenge-response/v1/newSession"
 
@@ -60,16 +81,8 @@ func CreateVeraisonSession() (*verification.ChallengeResponseSession, string, er
 
 	newSession, sessionURI, err := cfg.NewSession()
 	if err != nil {
-		return nil, "", fmt.Errorf("new session failed: %v", err)
+		return nil, nil, "", fmt.Errorf("new session failed: %v", err)
 	}
 
-	return newSession, sessionURI, nil
-}
-
-func EncryptChallenge(nonce []byte) ([]byte, error) {
-	var encryptedChallenge = []byte{}
-
-	// TODO: encrypt
-
-	return encryptedChallenge, nil
+	return &cfg, newSession, sessionURI, nil
 }

@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/uuid"
+	"github.com/veraison/apiclient/verification"
 	"github.com/veraison/enact-demo/pkg/enactcorim"
 	"github.com/veraison/enact-demo/pkg/veraison"
 )
@@ -214,7 +215,34 @@ func parseKey(keyString string) (*ecdsa.PublicKey, error) {
 	return ret, nil
 }
 
-func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer, signatureBlob *bytes.Buffer) error {
+// TODO: golden value is node_id, tmps_attest_length, tpms_attest. Just concatenate it with signature
+func (n *NodeService) RouteEvidenceToVeraison(cfg *verification.ChallengeResponseConfig, sessionId string, nodeID string, goldenBlob *bytes.Buffer, signatureBlob *bytes.Buffer, evidenceDigest []byte) error {
+	// concatenate bytes, because Veraison expects a continious array
+	var concatenatedData []byte = append(goldenBlob.Bytes(), signatureBlob.Bytes()...)
+
+	// POST to Veraison
+	attestationResultJSON, err := veraison.SendEvidenceAndSignature(cfg, sessionId, concatenatedData)
+
+	// TODO: parse response and only continue if it's 200
+	_ = attestationResultJSON
+
+	// repackage as cbor
+	evidenceCbor, err := enactcorim.RepackageEvidence(nodeID, evidenceDigest)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	// - `POST /submit, Body: { CoRIM }` to veraison backend and forward response to agent
+	err = veraison.SendEvidenceCborToVeraison(evidenceCbor)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	return nil
+}
+
+func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer, signatureBlob *bytes.Buffer) ([]byte, error) {
 	log.Println("goldenBlob + signature bytes:", len(goldenBlob.Bytes())+len(signatureBlob.Bytes()))
 
 	bigEndianBuf := &bytes.Buffer{}
@@ -223,7 +251,7 @@ func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer,
 
 	// Read 16 byte node_id from the beginning of the whole blob
 	val := goldenBlob.Next(16)
-	agentNodeId, err := uuid.FromBytes(val)
+	_, err := uuid.FromBytes(val)
 	if err != nil {
 		log.Println(err)
 	}
@@ -355,9 +383,9 @@ func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer,
 	nonce := extraData
 	log.Println("nonce:", nonce)
 
-	node, err := n.repo.GetNodeById(agentNodeId.String())
+	node, err := n.repo.GetNodeById(nodeID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	key, err := parseKey(node.AK_Pub)
@@ -367,7 +395,7 @@ func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer,
 
 	err = t.VerifySignature(key)
 	if err != nil {
-		return err
+		return nil, err
 	} else {
 		log.Println("Signature check is GOOD.")
 		//Store golden PCR value in Enact DB
@@ -381,7 +409,7 @@ func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer,
 	}
 	log.Println("wrote blob to file")
 
-	return nil
+	return evidenceDigest, nil
 }
 
 func (n *NodeService) HandleEvidence(nodeID string, evidenceBlob *bytes.Buffer, signatureBlob *bytes.Buffer) error {
