@@ -142,9 +142,9 @@ func goldenValues(
 	return buildCorim(corimTemplate, &c)
 }
 
-func RepackageEvidence(nodeID string, evidenceDigest []byte) ([]byte, error) {
+func RepackageEvidence(nodeID uuid.UUID, evidenceDigest []byte) ([]byte, error) {
 	var algID = swid.Sha256
-	corim, err := goldenValues(algID, evidenceDigest, nodeID, gvComidTemplate, corimTemplate)
+	corim, err := goldenValues(algID, evidenceDigest, nodeID, gvComidTemplate, CorimTemplate)
 	if err != nil {
 		log.Fatal(err)
 		return nil, err
