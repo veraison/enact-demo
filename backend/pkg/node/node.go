@@ -242,6 +242,37 @@ func (n *NodeService) RouteEvidenceToVeraison(cfg *verification.ChallengeRespons
 	return nil
 }
 
+// Relies on token.Decode instead of fully parsing the blob manually.
+func (n *NodeService) ProcessEvidence(node_id string, evidenceBlob *bytes.Buffer, signatureBlob *bytes.Buffer) ([]byte, uuid.UUID, error) {
+	log.Println("goldenBlob + signature bytes:", len(evidenceBlob.Bytes())+len(signatureBlob.Bytes()))
+
+	buffer, node_uuid, err := parseEvidenceAndSignatureBlobs(evidenceBlob, signatureBlob)
+	if err != nil {
+		log.Println(err)
+		return nil, uuid.UUID{}, errors.New("error parsing evidence and signature blobs")
+	}
+
+	token := EnactToken{}
+	err = token.Decode(buffer.Bytes())
+	if err != nil {
+		log.Println(err)
+		return nil, uuid.UUID{}, errors.New("error decoding token")
+	}
+
+	nonce := token.AttestationData.ExtraData
+
+	// TODO: determine if this check is needed
+	if len(token.AttestationData.AttestedQuoteInfo.PCRDigest) == 0 {
+		return nil, node_uuid, errors.New("blob doesn't contain PCR Digest")
+	}
+
+	return nonce, node_uuid, nil
+}
+
+// TODO: parse by inserting into the token type like we did on our backend
+// read node_id, the rest is the token
+// rm NVChip
+// tpm sim -> go to git repo -> ./tpm-server
 func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer, signatureBlob *bytes.Buffer) ([]byte, uuid.UUID, error) {
 	log.Println("goldenBlob + signature bytes:", len(goldenBlob.Bytes())+len(signatureBlob.Bytes()))
 

@@ -70,7 +70,7 @@ func SendEvidenceCborToVeraison(cbor []byte) error {
 // TODO: SESSION - call api-agent - should get 201 response from Veraison frontend
 func CreateVeraisonSession() (*verification.ChallengeResponseConfig, *verification.ChallengeResponseSession, string, error) {
 	// localhost?
-	var sessionURI = "http://veraison.example/challenge-response/v1/newSession"
+	var sessionURI = "http://localhost:8080/challenge-response/v1/newSession"
 
 	cfg := verification.ChallengeResponseConfig{
 		NonceSz:       32,
