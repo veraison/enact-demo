@@ -252,6 +252,9 @@ func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer,
 	// Read 16 byte node_id from the beginning of the whole blob
 	val := goldenBlob.Next(16)
 	uuidNodeId, err := uuid.FromBytes(val)
+
+	fmt.Sprintf("%x", uuidNodeId)
+
 	if err != nil {
 		log.Println(err)
 	}
