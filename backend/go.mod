@@ -14,6 +14,7 @@ require (
 	github.com/go-playground/universal-translator v0.18.0 // indirect
 	github.com/go-playground/validator/v10 v10.10.0 // indirect
 	github.com/goccy/go-json v0.7.6 // indirect
+	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-tpm v0.3.3
 	github.com/google/uuid v1.3.0

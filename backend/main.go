@@ -190,7 +190,8 @@ func setupRoutes(nodeService *node.NodeService) *gin.Engine {
 			})
 		}
 
-		evidenceDigest, uuidNodeId, err := nodeService.HandleGoldenValue(nodeID, golden_blob_buf, signature_blob_buf)
+		// evidenceDigest, uuidNodeId, err := nodeService.HandleGoldenValue(nodeID, golden_blob_buf, signature_blob_buf)
+		evidenceDigest, uuidNodeId, err := nodeService.ProcessEvidence(nodeID, golden_blob_buf, signature_blob_buf)
 		if err != nil {
 			log.Println(err.Error())
 			c.JSON(500, gin.H{
