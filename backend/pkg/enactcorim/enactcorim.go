@@ -135,6 +135,7 @@ func goldenValues(
 		return nil, fmt.Errorf("cannot set nodeID")
 	}
 
+    fmt.Println(fmt.Sprintf("algID=0x%x len of digest = %d \n digest = 0x%x", algID, len(digest)))
 	if gv.Measurements[0].AddDigest(algID, digest) == nil {
 		return nil, fmt.Errorf("cannot set golden value")
 	}

@@ -243,30 +243,30 @@ func (n *NodeService) RouteEvidenceToVeraison(cfg *verification.ChallengeRespons
 }
 
 // Relies on token.Decode instead of fully parsing the blob manually.
-func (n *NodeService) ProcessEvidence(node_id string, evidenceBlob *bytes.Buffer, signatureBlob *bytes.Buffer) ([]byte, uuid.UUID, error) {
+func (n *NodeService) ProcessEvidence(node_id string, evidenceBlob *bytes.Buffer, signatureBlob *bytes.Buffer) ([]byte, []byte, uuid.UUID, error) {
 	log.Println("goldenBlob + signature bytes:", len(evidenceBlob.Bytes())+len(signatureBlob.Bytes()))
 
 	buffer, node_uuid, err := parseEvidenceAndSignatureBlobs(evidenceBlob, signatureBlob)
 	if err != nil {
 		log.Println(err)
-		return nil, uuid.UUID{}, errors.New("error parsing evidence and signature blobs")
+		return nil, nil, uuid.UUID{}, errors.New("error parsing evidence and signature blobs")
 	}
 
 	token := EnactToken{}
 	err = token.Decode(buffer.Bytes())
 	if err != nil {
 		log.Println(err)
-		return nil, uuid.UUID{}, errors.New("error decoding token")
+		return nil, nil, uuid.UUID{}, errors.New("error decoding token")
 	}
 
 	nonce := token.AttestationData.ExtraData
 
 	// TODO: determine if this check is needed
 	if len(token.AttestationData.AttestedQuoteInfo.PCRDigest) == 0 {
-		return nil, node_uuid, errors.New("blob doesn't contain PCR Digest")
+		return nil, nil, node_uuid, errors.New("blob doesn't contain PCR Digest")
 	}
 
-	return nonce, node_uuid, nil
+	return token.AttestationData.AttestedQuoteInfo.PCRDigest, nonce, node_uuid, nil
 }
 
 // TODO: parse by inserting into the token type like we did on our backend
