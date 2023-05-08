@@ -256,14 +256,23 @@ func setupRoutes(nodeService *node.NodeService) *gin.Engine {
 			})
 		}
 
-		err = nodeService.HandleEvidence(nodeID, evidence_blob_buf, signature_blob_buf)
+		// err = nodeService.HandleEvidence(nodeID, evidence_blob_buf, signature_blob_buf)
+		evidenceDigest, uuidNodeId, err := nodeService.ProcessEvidence(nodeID, evidence_blob_buf, signature_blob_buf)
 		if err != nil {
 			log.Println(err.Error())
 			c.JSON(500, gin.H{
 				"error": err.Error(),
 			})
 		} else {
-			c.Status(201)
+			err = nodeService.RouteEvidenceToVeraison(globalCfg, VeraisonSessionTable[nodeID], uuidNodeId, evidence_blob_buf, signature_blob_buf, evidenceDigest)
+			if err != nil {
+				log.Println(err.Error())
+				c.JSON(500, gin.H{
+					"error": err.Error(),
+				})
+			} else {
+				c.Status(201)
+			}
 		}
 	})
 
