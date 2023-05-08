@@ -1,6 +1,16 @@
 # EnactTrust - Veraison Backend
 
+Launch using
+
+```
+go run ./main.go
+```
+
+Make sure you have [Veraison services](https://github.com/veraison/services/) running and the [EnactTrust agent](https://github.com/EnactTrust/enact) installed.
+
 ## Misc
+
+### Onboarding
 
 1. From agent: `POST /node/pem, Body: { nodeID, AK_pub, EK_pub }`
 2. Generate node_id (UUID v4)
@@ -8,11 +18,7 @@
 4. Repackage node_id and AK pub as CoRIM
 5. `POST /submit, Body: { CoRIM }` to veraison backend and forward response to agent
 
-
-https://medium.com/webauthnworks/verifying-fido-tpm2-0-attestation-fc7243847498
-
-https://dox.ipxe.org/structTPMS__ATTEST.html
-
+### Evidence
 
 // Table 116 - TPMS_ATTEST Structure
  typedef struct {
@@ -30,22 +36,3 @@ https://dox.ipxe.org/structTPMS__ATTEST.html
    UINT16 size;
    BYTE   attestationData[sizeof(TPMS_ATTEST)];
  } TPM2B_ATTEST;
-
-
-https://dox.ipxe.org/structTPM2B__ATTEST.html
-
-https://github.com/EnactTrust/enact/blob/8f4d4f741238e015d51aaa9d97ab0a7b94b635a0/enact.h#L93
-
-https://github.com/EnactTrust/enact/blob/8f4d4f741238e015d51aaa9d97ab0a7b94b635a0/agent.c#L352
-
-
-https://github.com/EnactTrust/enact/blob/8f4d4f741238e015d51aaa9d97ab0a7b94b635a0/agent.c#L387
-
-
-little: 1110001
-big: 01001101
-
-### Print formatted bytes
-fmt.Printf("% 08b", bigEndianBuf)
-
-log.Printf("%b", val)
