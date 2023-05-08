@@ -142,9 +142,9 @@ func setupRoutes(nodeService *node.NodeService) *gin.Engine {
 			c.Data(201, "application/octet-stream", sessionCtx.Nonce)
 
 			// Option 2 -> binary [] passed to the writer interface, with correct response code 201 Created
-			c.Writer.WriteHeader(201)
-			c.Header("Content-Type", "application/octet-stream")
-			c.Writer.Write(sessionCtx.Nonce)
+			// c.Writer.WriteHeader(201)
+			// c.Header("Content-Type", "application/octet-stream")
+			// c.Writer.Write(sessionCtx.Nonce)
 
 		}
 	})
