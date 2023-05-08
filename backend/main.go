@@ -132,8 +132,20 @@ func setupRoutes(nodeService *node.NodeService) *gin.Engine {
 			VeraisonSessionTable[nodeID] = sessionURI
 
 			// On success -> write 204 and return the challenge []byte to the agent
-			c.Writer.WriteHeader(204)
+			// c.Writer.WriteHeader(204)
+			// c.Writer.Write(sessionCtx.Nonce)
+
+			// Option 1 -> binary [] written in the HTTP response body stream without a content type, but with correct response code
+			//  RFC2046 says "The "octet-stream" subtype is used to indicate that a body contains arbitrary binary data"
+			// 	and "The recommended action for an implementation that receives an "application/octet-stream" entity
+			// 	is to simply offer to put the data in a file
+			c.Data(201, "application/octet-stream", sessionCtx.Nonce)
+
+			// Option 2 -> binary [] passed to the writer interface, with correct response code 201 Created
+			c.Writer.WriteHeader(201)
+			c.Header("Content-Type", "application/octet-stream")
 			c.Writer.Write(sessionCtx.Nonce)
+
 		}
 	})
 
