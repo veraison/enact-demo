@@ -92,7 +92,6 @@ func (n *NodeService) HandleReceivePEM(akPub string, ekPub string) (uuid.UUID, e
 	return nodeID, nil
 }
 
-// TODO: move to util module if func is still needed
 func concatBuffers(firstBlob *bytes.Buffer, secondBlob *bytes.Buffer) *bytes.Buffer {
 	buf := &bytes.Buffer{}
 
@@ -215,7 +214,7 @@ func parseKey(keyString string) (*ecdsa.PublicKey, error) {
 	return ret, nil
 }
 
-// TODO: golden value is node_id, tmps_attest_length, tpms_attest. Just concatenate it with signature
+// golden value is node_id, tmps_attest_length, tpms_attest. Just concatenate it with signature blob.
 func (n *NodeService) RouteEvidenceToVeraison(cfg *verification.ChallengeResponseConfig, sessionId string, nodeID uuid.UUID, goldenBlob *bytes.Buffer, signatureBlob *bytes.Buffer, evidenceDigest []byte) error {
 	// concatenate bytes, because Veraison expects a continious array
 	var concatenatedData []byte = append(goldenBlob.Bytes(), signatureBlob.Bytes()...)
@@ -269,7 +268,6 @@ func (n *NodeService) ProcessEvidence(node_id string, evidenceBlob *bytes.Buffer
 	return token.AttestationData.AttestedQuoteInfo.PCRDigest, nonce, node_uuid, nil
 }
 
-// TODO: parse by inserting into the token type like we did on our backend
 // read node_id, the rest is the token
 // rm NVChip
 // tpm sim -> go to git repo -> ./tpm-server
@@ -339,7 +337,6 @@ func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer,
 
 	// 5. Digest
 	val = goldenBlob.Next(2)
-	// TODO: check digestSize, should usually be 24 bytes for SHA-256
 	digestSize := binary.BigEndian.Uint16(val)
 	evidenceDigest := goldenBlob.Next(int(digestSize))
 	// Size field is already Big Endian
@@ -461,8 +458,6 @@ func (n *NodeService) HandleEvidence(nodeID string, evidenceBlob *bytes.Buffer, 
 	if err != nil {
 		return err
 	}
-
-	// TODO: parse TPMS_ATTEST
 
 	return nil
 }

@@ -23,8 +23,6 @@ var (
 var globalCfg *verification.ChallengeResponseConfig
 
 func setupServices() *node.NodeService {
-	// TODO: Load env vars from config
-
 	// DB setup
 	db, err := db.InitDatabaseConnection()
 	if err != nil {
@@ -63,7 +61,7 @@ func setupRoutes(nodeService *node.NodeService) *gin.Engine {
 		}
 
 		ak_name := c.PostForm("ak_name")
-		log.Println(ak_name)
+		_ = ak_name
 
 		// Allocate buffers, so we can read the files
 		ak_pub_buf := bytes.NewBuffer(nil)
@@ -94,7 +92,7 @@ func setupRoutes(nodeService *node.NodeService) *gin.Engine {
 		if err != nil {
 			log.Println(err.Error())
 		}
-		// TODO: SESSION - store ak_name and ek_pub, so we can use them in /node/secret
+		// Store ak_name and ek_pub, so we can use them in /node/secret
 		// Handle first step of node onboarding
 		nodeID, err := nodeService.HandleReceivePEM(ak_pub_buf.String(), ek_pub_buf.String())
 		if err != nil {
@@ -112,8 +110,7 @@ func setupRoutes(nodeService *node.NodeService) *gin.Engine {
 		nodeID := c.PostForm("node_id")
 
 		// 1. call Veraison frontend
-		// 2. TODO: encrypt the nonce (the challenge) returned by Veraison
-		// 3. store the session_id (regenerated on every call to /session) to make calls later
+		// 2. store the session_id (regenerated on every call to /session) to make calls later
 		cfg, sessionCtx, sessionURI, err := veraison.CreateVeraisonSession()
 
 		globalCfg = cfg
@@ -130,10 +127,6 @@ func setupRoutes(nodeService *node.NodeService) *gin.Engine {
 
 			// store session_id and associate it with node_id, so we can use it later to call Veraison
 			VeraisonSessionTable[nodeID] = sessionURI
-
-			// On success -> write 204 and return the challenge []byte to the agent
-			// c.Writer.WriteHeader(204)
-			// c.Writer.Write(sessionCtx.Nonce)
 
 			// Option 1 -> binary [] written in the HTTP response body stream without a content type, but with correct response code
 			//  RFC2046 says "The "octet-stream" subtype is used to indicate that a body contains arbitrary binary data"

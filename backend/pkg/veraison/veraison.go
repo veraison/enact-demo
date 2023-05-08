@@ -11,8 +11,6 @@ import (
 
 var TPMEvidenceMediaType = "application/vnd.enacttrust.tpm-evidence"
 
-// TODO: this needs to contain the concatenated nodeID in the beginning of
-// TPMS_ATTEST. This should be called after processing the evidence
 func SendTPMEvidenceToVeraison(cbor []byte) error {
 	// vnd-enacttrust.tpm-evidence from the diagram
 	return nil
@@ -25,7 +23,6 @@ func SendPEMToVeraison(cbor []byte) error {
 	// }
 	// This uses the Veraison api-client
 	cfg := provisioning.SubmitConfig{
-		// TODO: replace this with an env var URL
 		SubmitURI: "http://localhost:8888/endorsement-provisioning/v1/submit",
 	}
 	// The Run method is invoked on the instantiated SubmitConfig object to
