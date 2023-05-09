@@ -26,6 +26,6 @@ require (
 	github.com/veraison/eat v0.0.0-20210331113810-3da8a4dd42ff // indirect
 	github.com/veraison/go-cose v0.0.0-20201125131510-de93f6091ed4 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5 // indirect
+	golang.org/x/crypto v0.1.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 )
