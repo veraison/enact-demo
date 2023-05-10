@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 
@@ -69,17 +70,17 @@ func earCheck(b []byte) error {
 	var r ear.AttestationResult
 
 	if err := r.Verify(b, jwa.ES256, k); err != nil {
-		return fmt.Errorf("EAR verification failed: %w", err)
+		return fmt.Errorf("verification failed: %w", err)
 	}
 
 	appraisal, ok := r.Submods["TPM_ENACTTRUST"]
 	if !ok {
-		return fmt.Errorf("unexpected EAR format: missing TPM_ENACTTRUST submod")
+		return errors.New("unexpected format: missing TPM_ENACTTRUST submod")
 	}
 
 	// at a minimum, one needs to check the overall status
 	if *appraisal.Status != ear.TrustTierAffirming {
-		return fmt.Errorf("EAR verification failed: status=%s", *appraisal.Status)
+		return fmt.Errorf(`want "affirming", got %s`, *appraisal.Status)
 	}
 
 	return nil
@@ -102,7 +103,7 @@ func main() {
 
 	err = earCheck(ar)
 	if err != nil {
-		log.Fatalf("verify_ear: %v", err)
+		log.Fatalf("EAR check failed: %v", err)
 	}
 
 	fmt.Println(`all's well that ends well`)
