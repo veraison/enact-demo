@@ -1,19 +1,29 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 
+	"github.com/lestrrat-go/jwx/jwa"
+	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/veraison/apiclient/common"
 	"github.com/veraison/apiclient/verification"
+	"github.com/veraison/ear"
 )
 
 var (
-	EntryPoint           = "http://localhost:8080/challenge-response/v1/newSession"
-	SessionTable         = map[string]string{}
-	FakeNodeID           = "7dd5db06-d2f5-4e0d-8a9c-9baaa5a446ef"
-	FakeGolden           = []byte{0x00, 0x01, 0x02, 0x03}
-	TPMEvidenceMediaType = "application/vnd.enacttrust.tpm-evidence"
+	EntryPoint             = "http://localhost:8080/challenge-response/v1/newSession"
+	SessionTable           = map[string]string{}
+	FakeNodeID             = "7dd5db06-d2f5-4e0d-8a9c-9baaa5a446ef"
+	FakeGolden             = []byte{0x00, 0x01, 0x02, 0x03}
+	TPMEvidenceMediaType   = "application/vnd.enacttrust.tpm-evidence"
+	VeraisonECDSAPublicKey = `{
+	"kty": "EC",
+	"crv": "P-256",
+	"x": "usWxHK2PmfnHKwXPS54m0kTcGJ90UiglWiGahtagnv8",
+	"y": "IBOL-C3BttVivg-lSreASjpkttcsz-1rb7btKLv8EX4"
+}`
 )
 
 func phase1() (*verification.ChallengeResponseConfig, error) {
@@ -54,6 +64,28 @@ func phase2(cfg *verification.ChallengeResponseConfig) ([]byte, error) {
 	return ar, nil
 }
 
+func earCheck(b []byte) error {
+	k, _ := jwk.ParseKey([]byte(VeraisonECDSAPublicKey))
+
+	var r ear.AttestationResult
+
+	if err := r.Verify(b, jwa.ES256, k); err != nil {
+		return fmt.Errorf("verification failed: %w", err)
+	}
+
+	appraisal, ok := r.Submods["TPM_ENACTTRUST"]
+	if !ok {
+		return errors.New("unexpected format: missing TPM_ENACTTRUST submod")
+	}
+
+	// at a minimum, one needs to check the overall status
+	if *appraisal.Status != ear.TrustTierAffirming {
+		return fmt.Errorf(`want "affirming", got %s`, *appraisal.Status)
+	}
+
+	return nil
+}
+
 func main() {
 	cfg, err := phase1()
 	if err != nil {
@@ -69,5 +101,10 @@ func main() {
 		log.Fatalf("phase2: %v", err)
 	}
 
-	fmt.Println("attestation result: ", string(ar))
+	err = earCheck(ar)
+	if err != nil {
+		log.Fatalf("EAR check failed: %v", err)
+	}
+
+	fmt.Println(`all's well that ends well`)
 }
