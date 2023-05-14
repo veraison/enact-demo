@@ -14,7 +14,6 @@ require (
 	github.com/go-playground/universal-translator v0.18.0 // indirect
 	github.com/go-playground/validator/v10 v10.10.0 // indirect
 	github.com/goccy/go-json v0.7.6 // indirect
-	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-tpm v0.3.3
 	github.com/google/uuid v1.3.0
@@ -38,10 +37,10 @@ require (
 	github.com/veraison/corim v0.0.0-20220131142553-4211ff85addf
 	github.com/veraison/eat v0.0.0-20210331113810-3da8a4dd42ff // indirect
 	github.com/veraison/go-cose v0.0.0-20201125131510-de93f6091ed4 // indirect
-	github.com/veraison/swid v0.0.1-beta.6 // indirect
+	github.com/veraison/swid v0.0.1-beta.6
 	github.com/x448/float16 v0.8.4 // indirect
 	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3 // indirect
-	golang.org/x/sys v0.0.0-20211216021012-1d35b9e2eb4e // indirect
+	golang.org/x/sys v0.1.0 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
