@@ -14,26 +14,32 @@
 package veraison
 
 import (
+	"errors"
 	"fmt"
 	"log"
 
+	"github.com/lestrrat-go/jwx/jwa"
+	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/veraison/apiclient/common"
 	"github.com/veraison/apiclient/provisioning"
 	"github.com/veraison/apiclient/verification"
+	"github.com/veraison/ear"
 )
 
 var TPMEvidenceMediaType = "application/vnd.enacttrust.tpm-evidence"
+var VeraisonECDSAPublicKey = `{
+	"kty": "EC",
+	"crv": "P-256",
+	"x": "usWxHK2PmfnHKwXPS54m0kTcGJ90UiglWiGahtagnv8",
+	"y": "IBOL-C3BttVivg-lSreASjpkttcsz-1rb7btKLv8EX4"
+}`
 
 func SendTPMEvidenceToVeraison(cbor []byte) error {
 	// vnd-enacttrust.tpm-evidence from the diagram
 	return nil
 }
 
-func SendPEMToVeraison(cbor []byte) error {
-	// writeErr := os.WriteFile("pem-to-veraison", cbor, 0666)
-	// if writeErr != nil {
-	// 	log.Println("pem")
-	// }
+func SendCborToVeraison(cbor []byte) error {
 	// This uses the Veraison api-client
 	cfg := provisioning.SubmitConfig{
 		SubmitURI: "http://localhost:8888/endorsement-provisioning/v1/submit",
@@ -53,11 +59,13 @@ func SendPEMToVeraison(cbor []byte) error {
 		return err
 	}
 
-	log.Println("CORIM successfully sent to Veraison")
+	log.Println("CORIM cbor successfully sent to Veraison")
 
 	return nil
 }
 
+// this corresponds to phase2 from
+// https://github.com/veraison/enact-demo/blob/38e97e32d302d8627489de6127839d4929dfc819/examples/async-apiclient/main.go#L51
 func SendEvidenceAndSignature(cfg *verification.ChallengeResponseConfig, sessionId string, data []byte) ([]byte, error) {
 	// TODO: check if the session exists
 	// if !ok {
@@ -73,8 +81,12 @@ func SendEvidenceAndSignature(cfg *verification.ChallengeResponseConfig, session
 	return attestationResultJSON, nil
 }
 
-func SendEvidenceCborToVeraison(cbor []byte) error {
-	return nil
+// This does POST /submit, Body: { CoRIM }`
+
+func RepackageEvidenceAndSendToVeraison(cfg *verification.ChallengeResponseConfig) {
+	// TODO: repackage as golden value CoRIM
+
+	// TODO: POST /submit
 }
 
 func CreateVeraisonSession() (*verification.ChallengeResponseConfig, *verification.ChallengeResponseSession, string, error) {
@@ -94,4 +106,27 @@ func CreateVeraisonSession() (*verification.ChallengeResponseConfig, *verificati
 	}
 
 	return &cfg, newSession, sessionURI, nil
+}
+
+// This is the attestation result check
+func EarCheck(b []byte) error {
+	k, _ := jwk.ParseKey([]byte(VeraisonECDSAPublicKey))
+
+	var r ear.AttestationResult
+
+	if err := r.Verify(b, jwa.ES256, k); err != nil {
+		return fmt.Errorf("verification failed: %w", err)
+	}
+
+	appraisal, ok := r.Submods["TPM_ENACTTRUST"]
+	if !ok {
+		return errors.New("unexpected format: missing TPM_ENACTTRUST submod")
+	}
+
+	// at a minimum, one needs to check the overall status
+	if *appraisal.Status != ear.TrustTierAffirming {
+		return fmt.Errorf(`want "affirming", got %s`, *appraisal.Status)
+	}
+
+	return nil
 }

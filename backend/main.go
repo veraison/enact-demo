@@ -219,8 +219,15 @@ func setupRoutes(nodeService *node.NodeService) *gin.Engine {
 				"error": err.Error(),
 			})
 		} else {
-			err = nodeService.RouteEvidenceToVeraison(globalCfg, VeraisonSessionTable[nodeID], uuidNodeId, golden_blob_buf, signature_blob_buf, evidenceDigest)
-			c.Status(201)
+			err = nodeService.RouteGoldenValueToVeraison(globalCfg, VeraisonSessionTable[nodeID], uuidNodeId, golden_blob_buf, signature_blob_buf, evidenceDigest)
+			if err != nil {
+				log.Println(err.Error())
+				c.JSON(500, gin.H{
+					"error": err.Error(),
+				})
+			} else {
+				c.Status(201)
+			}
 		}
 	})
 
