@@ -34,11 +34,14 @@ func parseEvidenceAndSignatureBlobs(evidenceBlob *bytes.Buffer, signatureBlob *b
 	// Read 16 byte node_id from the beginning of the whole blob
 	val := evidenceBlob.Next(16)
 	uuidNodeId, err := uuid.FromBytes(val)
+	//uuidNodeId, err := uuid.Parse(string(val[:])
+	//uuidNodeId := base64.RawURLEncoding.EncodeToString(val[:])
 	if err != nil {
 		log.Println(err)
 		return nil, uuid.UUID{}, err
 	}
-	fmt.Sprintf("%x", uuidNodeId)
+	//log.Println(fmt.Sprintf("%x", uuidNodeId))
+	fmt.Printf("parseEvidence uuidNodeID Raw bytes: %x\n", [16]byte(uuidNodeId))
 
 	// 0. TPMS_ATTEST Size
 	val = evidenceBlob.Next(2)

@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jwk"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/veraison/apiclient/common"
 	"github.com/veraison/apiclient/provisioning"
 	"github.com/veraison/apiclient/verification"
@@ -71,6 +71,11 @@ func SendEvidenceAndSignature(cfg *verification.ChallengeResponseConfig, session
 	// if !ok {
 	// 	return nil, fmt.Errorf("no session URI found for node %q", FakeNodeID)
 	// }
+	log.Print("sessionID")
+	log.Println(sessionId)
+
+	log.Println("sessionId: ", sessionId)
+	log.Println("data length: ", len(data))
 
 	// extract golden values from body
 	attestationResultJSON, err := cfg.ChallengeResponse(data, TPMEvidenceMediaType, sessionId)
@@ -114,7 +119,11 @@ func EarCheck(b []byte) error {
 
 	var r ear.AttestationResult
 
-	if err := r.Verify(b, jwa.ES256, k); err != nil {
+	s := fmt.Sprintf("%x", b)
+	fmt.Println(s)
+	log.Println("Length of EarCheck byte slice=", len(b))
+
+	if err := r.Verify(b, jwa.KeyAlgorithmFrom(jwa.ES256), k); err != nil {
 		return fmt.Errorf("verification failed: %w", err)
 	}
 
@@ -129,4 +138,32 @@ func EarCheck(b []byte) error {
 	}
 
 	return nil
+}
+
+func dumpByteSlice(b []byte) {
+	var a [16]byte
+	n := (len(b) + 15) &^ 15
+	for i := 0; i < n; i++ {
+		if i%16 == 0 {
+			fmt.Printf("%4d", i)
+		}
+		if i%8 == 0 {
+			fmt.Print(" ")
+		}
+		if i < len(b) {
+			fmt.Printf(" %02X", b[i])
+		} else {
+			fmt.Print("   ")
+		}
+		if i >= len(b) {
+			a[i%16] = ' '
+		} else if b[i] < 32 || b[i] > 126 {
+			a[i%16] = '.'
+		} else {
+			a[i%16] = b[i]
+		}
+		if i%16 == 15 {
+			fmt.Printf("  %s\n", string(a[:]))
+		}
+	}
 }
