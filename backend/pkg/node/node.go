@@ -232,25 +232,28 @@ func parseKey(keyString string) (*ecdsa.PublicKey, error) {
 // golden value is node_id, tmps_attest_length, tpms_attest. Just concatenate it with signature blob.
 func (n *NodeService) RouteGoldenValueToVeraison(cfg *verification.ChallengeResponseConfig, sessionId string, nodeID uuid.UUID, bigEndianBuf []byte, evidenceDigest []byte) error {
 	// concatenate bytes, because Veraison expects a continious array
+	// fmt.Printf("RouteGolden NodeID Raw bytes: %x\n", [16]byte(nodeID))
+	// var concatenatedData []byte = append(nodeID[:], bigEndianBuf...)
+	// log.Println("concatenatedData length: ", len(concatenatedData))
+	// fmt.Printf("%x", concatenatedData)
+	_ = nodeID
+	_ = bigEndianBuf
 
-	fmt.Printf("RouteGolden NodeID Raw bytes: %x\n", [16]byte(nodeID))
-	var concatenatedData []byte = append(nodeID[:], bigEndianBuf...)
-	log.Println("concatenatedData length: ", len(concatenatedData))
 	// POST to Veraison
-	attestationResultJSON, err := veraison.SendEvidenceAndSignature(cfg, sessionId, concatenatedData)
-	if err != nil {
-		log.Println("SendEvidenceAndSignature result: FAILURE %v", err)
-		return err
-	}
+	// attestationResultJSON, err := veraison.SendEvidenceAndSignature(cfg, sessionId, concatenatedData)
+	// if err != nil {
+	// 	log.Println("SendEvidenceAndSignature result: FAILURE %v", err)
+	// 	return err
+	// }
 
-	// Parse attestation result
-	err = veraison.EarCheck(attestationResultJSON)
-	if err != nil {
-		log.Println("Attestation result: FAILURE %v", err)
-		return err
-	}
-
-	log.Println("Attestation result: SUCCESS")
+	// // Parse attestation result
+	// err = veraison.EarCheck(attestationResultJSON)
+	// if err != nil {
+	// 	log.Println("Attestation result: FAILURE %v", err)
+	// 	return err
+	// }
+	//
+	//log.Println("Attestation result: SUCCESS")
 
 	// after the attestation result is parsed, we repackage the golden value and
 	// perform POST /submit, Body: { CoRIM }`
@@ -271,9 +274,11 @@ func (n *NodeService) RouteGoldenValueToVeraison(cfg *verification.ChallengeResp
 // golden value is node_id, tmps_attest_length, tpms_attest. Just concatenate it with signature blob.
 func (n *NodeService) RouteEvidenceToVeraison(cfg *verification.ChallengeResponseConfig, sessionId string, nodeID uuid.UUID, bigEndianBuf []byte, evidenceDigest []byte) error {
 	// concatenate bytes, because Veraison expects a continious array
+	fmt.Printf("RouteGolden NodeID Raw bytes: %x\n", [16]byte(nodeID))
 	var concatenatedData []byte = append(nodeID[:], bigEndianBuf...)
-
 	log.Println("concatenatedData length: ", len(concatenatedData))
+	fmt.Printf("%x", concatenatedData)
+
 	// POST to Veraison
 	attestationResultJSON, err := veraison.SendEvidenceAndSignature(cfg, sessionId, concatenatedData)
 	if err != nil {

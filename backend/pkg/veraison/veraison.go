@@ -78,6 +78,7 @@ func SendEvidenceAndSignature(cfg *verification.ChallengeResponseConfig, session
 	log.Println("data length: ", len(data))
 
 	// extract golden values from body
+	fmt.Printf("\n%x\n", data)
 	attestationResultJSON, err := cfg.ChallengeResponse(data, TPMEvidenceMediaType, sessionId)
 	if err != nil {
 		return nil, fmt.Errorf("challenge-response session failed: %v", err)
