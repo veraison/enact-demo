@@ -14,6 +14,7 @@
 package veraison
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -79,12 +80,17 @@ func SendEvidenceAndSignature(cfg *verification.ChallengeResponseConfig, session
 
 	// extract golden values from body
 	fmt.Printf("\n%x\n", data)
-	attestationResultJSON, err := cfg.ChallengeResponse(data, TPMEvidenceMediaType, sessionId)
+	attestationResultRawMessage, err := cfg.ChallengeResponse(data, TPMEvidenceMediaType, sessionId)
 	if err != nil {
 		return nil, fmt.Errorf("challenge-response session failed: %v", err)
 	}
 
-	return attestationResultJSON, nil
+	var attestationResultJWT string
+	if err = json.Unmarshal(attestationResultRawMessage, &attestationResultJWT); err != nil {
+		return nil, fmt.Errorf("challenge-response result decoding failed: %v", err)
+	}
+
+	return []byte(attestationResultJWT), nil
 }
 
 // This does POST /submit, Body: { CoRIM }`
