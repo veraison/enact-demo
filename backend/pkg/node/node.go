@@ -64,6 +64,8 @@ func (n *NodeService) HandleReceivePEM(akPub string, ekPub string) (uuid.UUID, e
 		return nodeID, err
 	}
 
+	log.Println(fmt.Sprintf("%x", nodeID))
+
 	// 3. Init node entity and store it in the db
 	node := Node{
 		ID:         nodeID,
@@ -96,7 +98,7 @@ func (n *NodeService) HandleReceivePEM(akPub string, ekPub string) (uuid.UUID, e
 	log.Println(`successfully converted corim to cbor`)
 
 	// 5. `POST /submit, Body: { CoRIM }` to veraison backend and forward response to agent
-	err = veraison.SendPEMToVeraison(cbor)
+	err = veraison.SendCborToVeraison(cbor)
 	if err != nil {
 		log.Println(err)
 		return nodeID, err
@@ -228,25 +230,40 @@ func parseKey(keyString string) (*ecdsa.PublicKey, error) {
 }
 
 // golden value is node_id, tmps_attest_length, tpms_attest. Just concatenate it with signature blob.
-func (n *NodeService) RouteEvidenceToVeraison(cfg *verification.ChallengeResponseConfig, sessionId string, nodeID uuid.UUID, goldenBlob *bytes.Buffer, signatureBlob *bytes.Buffer, evidenceDigest []byte) error {
+func (n *NodeService) RouteGoldenValueToVeraison(cfg *verification.ChallengeResponseConfig, sessionId string, nodeID uuid.UUID, bigEndianBuf []byte, evidenceDigest []byte) error {
 	// concatenate bytes, because Veraison expects a continious array
-	var concatenatedData []byte = append(goldenBlob.Bytes(), signatureBlob.Bytes()...)
+	// fmt.Printf("RouteGolden NodeID Raw bytes: %x\n", [16]byte(nodeID))
+	// var concatenatedData []byte = append(nodeID[:], bigEndianBuf...)
+	// log.Println("concatenatedData length: ", len(concatenatedData))
+	// fmt.Printf("%x", concatenatedData)
+	_ = nodeID
+	_ = bigEndianBuf
 
 	// POST to Veraison
-	attestationResultJSON, err := veraison.SendEvidenceAndSignature(cfg, sessionId, concatenatedData)
+	// attestationResultJSON, err := veraison.SendEvidenceAndSignature(cfg, sessionId, concatenatedData)
+	// if err != nil {
+	// 	log.Println("SendEvidenceAndSignature result: FAILURE %v", err)
+	// 	return err
+	// }
 
-	// TODO: parse response and only continue if it's 200
-	_ = attestationResultJSON
+	// // Parse attestation result
+	// err = veraison.EarCheck(attestationResultJSON)
+	// if err != nil {
+	// 	log.Println("Attestation result: FAILURE %v", err)
+	// 	return err
+	// }
+	//
+	//log.Println("Attestation result: SUCCESS")
 
-	// repackage as cbor
+	// after the attestation result is parsed, we repackage the golden value and
+	// perform POST /submit, Body: { CoRIM }`
 	evidenceCbor, err := enactcorim.RepackageEvidence(nodeID, evidenceDigest)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
-	// - `POST /submit, Body: { CoRIM }` to veraison backend and forward response to agent
-	err = veraison.SendEvidenceCborToVeraison(evidenceCbor)
+	err = veraison.SendCborToVeraison(evidenceCbor)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -254,31 +271,57 @@ func (n *NodeService) RouteEvidenceToVeraison(cfg *verification.ChallengeRespons
 	return nil
 }
 
+// golden value is node_id, tmps_attest_length, tpms_attest. Just concatenate it with signature blob.
+func (n *NodeService) RouteEvidenceToVeraison(cfg *verification.ChallengeResponseConfig, sessionId string, nodeID uuid.UUID, bigEndianBuf []byte, evidenceDigest []byte) error {
+	// concatenate bytes, because Veraison expects a continious array
+	fmt.Printf("RouteGolden NodeID Raw bytes: %x\n", [16]byte(nodeID))
+	var concatenatedData []byte = append(nodeID[:], bigEndianBuf...)
+	log.Println("concatenatedData length: ", len(concatenatedData))
+	fmt.Printf("%x", concatenatedData)
+
+	// POST to Veraison
+	attestationResultJSON, err := veraison.SendEvidenceAndSignature(cfg, sessionId, concatenatedData)
+	if err != nil {
+		log.Println(err)
+	}
+
+	// Parse attestation result
+	err = veraison.EarCheck(attestationResultJSON)
+	if err != nil {
+		log.Println("Attestation result: FAILURE")
+		return err
+	}
+
+	log.Println("Attestation result: SUCCESS")
+
+	return nil
+}
+
 // Relies on token.Decode instead of fully parsing the blob manually.
-func (n *NodeService) ProcessEvidence(node_id string, evidenceBlob *bytes.Buffer, signatureBlob *bytes.Buffer) ([]byte, []byte, uuid.UUID, error) {
+func (n *NodeService) ProcessEvidence(node_id string, evidenceBlob *bytes.Buffer, signatureBlob *bytes.Buffer) ([]byte, []byte, []byte, uuid.UUID, error) {
 	log.Println("goldenBlob + signature bytes:", len(evidenceBlob.Bytes())+len(signatureBlob.Bytes()))
 
 	buffer, node_uuid, err := parseEvidenceAndSignatureBlobs(evidenceBlob, signatureBlob)
 	if err != nil {
 		log.Println(err)
-		return nil, nil, uuid.UUID{}, errors.New("error parsing evidence and signature blobs")
+		return nil, nil, nil, uuid.UUID{}, errors.New("error parsing evidence and signature blobs")
 	}
 
 	token := EnactToken{}
 	err = token.Decode(buffer.Bytes())
 	if err != nil {
 		log.Println(err)
-		return nil, nil, uuid.UUID{}, errors.New("error decoding token")
+		return nil, nil, nil, uuid.UUID{}, errors.New("error decoding token")
 	}
 
 	nonce := token.AttestationData.ExtraData
 
 	// TODO: determine if this check is needed
 	if len(token.AttestationData.AttestedQuoteInfo.PCRDigest) == 0 {
-		return nil, nil, node_uuid, errors.New("blob doesn't contain PCR Digest")
+		return nil, nil, nil, node_uuid, errors.New("blob doesn't contain PCR Digest")
 	}
 
-	return token.AttestationData.AttestedQuoteInfo.PCRDigest, nonce, node_uuid, nil
+	return buffer.Bytes(), token.AttestationData.AttestedQuoteInfo.PCRDigest, nonce, node_uuid, nil
 }
 
 // read node_id, the rest is the token
@@ -295,7 +338,7 @@ func (n *NodeService) HandleGoldenValue(nodeID string, goldenBlob *bytes.Buffer,
 	val := goldenBlob.Next(16)
 	uuidNodeId, err := uuid.FromBytes(val)
 
-	fmt.Sprintf("%x", uuidNodeId)
+	log.Println(fmt.Sprintf("%x", uuidNodeId))
 
 	if err != nil {
 		log.Println(err)
